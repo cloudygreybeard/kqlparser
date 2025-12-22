@@ -1,0 +1,435 @@
+package token
+
+import "strconv"
+
+// Token represents a lexical token type.
+type Token int
+
+// Token constants
+const (
+	// Special tokens
+	ILLEGAL Token = iota
+	EOF
+	COMMENT
+
+	literalBeg
+	// Literals
+	IDENT      // identifier
+	INT        // 123, 0x1F
+	REAL       // 1.23, 1.23e10
+	STRING     // "abc", 'abc', @"abc"
+	DATETIME   // datetime(2023-01-01)
+	TIMESPAN   // 1d, 2h, 3m, timespan(1.02:03:04)
+	GUID       // guid(...)
+	BOOL       // true, false
+	DYNAMIC    // dynamic([1,2,3])
+	TYPE       // typeof(string)
+	literalEnd
+
+	operatorBeg
+	// Operators and delimiters
+	ADD // +
+	SUB // -
+	MUL // *
+	QUO // /
+	REM // %
+
+	EQL    // ==
+	NEQ    // != or <>
+	LSS    // <
+	GTR    // >
+	LEQ    // <=
+	GEQ    // >=
+	TILDE  // =~
+	NTILDE // !~
+
+	PIPE   // |
+	ASSIGN // =
+	COLON  // :
+	SEMI   // ;
+	COMMA  // ,
+	DOT    // .
+	DOTDOT // ..
+	ARROW  // =>
+
+	LPAREN   // (
+	RPAREN   // )
+	LBRACKET // [
+	RBRACKET // ]
+	LBRACE   // {
+	RBRACE   // }
+	operatorEnd
+
+	keywordBeg
+	// Keywords - Query operators
+	AS
+	BY
+	CONSUME
+	COUNT
+	DISTINCT
+	EVALUATE
+	EXTEND
+	FACET
+	FILTER
+	FIND
+	FORK
+	GETSCHEMA
+	INVOKE
+	JOIN
+	LIMIT
+	LOOKUP
+	MAKESERIES
+	MVAPPLY
+	MVEXPAND
+	ORDER
+	PARSE
+	PARTITION
+	PRINT
+	PROJECT
+	PROJECT_AWAY
+	PROJECT_KEEP
+	PROJECT_RENAME
+	PROJECT_REORDER
+	RANGE
+	REDUCE
+	RENDER
+	SAMPLE
+	SAMPLE_DISTINCT
+	SCAN
+	SEARCH
+	SERIALIZE
+	SORT
+	SUMMARIZE
+	TAKE
+	TOP
+	TOP_HITTERS
+	TOP_NESTED
+	UNION
+	WHERE
+
+	// Keywords - Statements
+	ALIAS
+	DECLARE
+	LET
+	PATTERN
+	RESTRICT
+	SET
+
+	// Keywords - Clauses
+	ACCESS
+	ASC
+	BETWEEN
+	DATABASE
+	DATASCOPE
+	DATATABLE
+	DEFAULT
+	DESC
+	EXTERNALDATA
+	FIRST
+	FROM
+	HOTCACHE
+	IN
+	KIND
+	LAST
+	MATERIALIZE
+	NOOPTIMIZATION
+	NULLS
+	OF
+	ON
+	STEP
+	TO
+	TOSCALAR
+	TOTABLE
+	VIEW
+	WITH
+	WITHSOURCE
+
+	// Keywords - Logical
+	AND
+	NOT
+	OR
+
+	// Keywords - Types
+	BOOL_TYPE
+	DATETIME_TYPE
+	DECIMAL_TYPE
+	DYNAMIC_TYPE
+	GUID_TYPE
+	INT_TYPE
+	LONG_TYPE
+	REAL_TYPE
+	STRING_TYPE
+	TIMESPAN_TYPE
+
+	// Keywords - String operators
+	CONTAINS
+	CONTAINS_CS
+	ENDSWITH
+	ENDSWITH_CS
+	HAS
+	HAS_ALL
+	HAS_ANY
+	HAS_CS
+	HASPREFIX
+	HASPREFIX_CS
+	HASSUFFIX
+	HASSUFFIX_CS
+	LIKE
+	MATCHES_REGEX
+	NOTCONTAINS
+	NOTCONTAINS_CS
+	STARTSWITH
+	STARTSWITH_CS
+
+	// Keywords - Misc
+	CLUSTER
+	NULL
+	PACK
+	TYPEOF
+	keywordEnd
+)
+
+var tokenStrings = [...]string{
+	ILLEGAL: "ILLEGAL",
+	EOF:     "EOF",
+	COMMENT: "COMMENT",
+
+	IDENT:    "IDENT",
+	INT:      "INT",
+	REAL:     "REAL",
+	STRING:   "STRING",
+	DATETIME: "DATETIME",
+	TIMESPAN: "TIMESPAN",
+	GUID:     "GUID",
+	BOOL:     "BOOL",
+	DYNAMIC:  "DYNAMIC",
+	TYPE:     "TYPE",
+
+	ADD: "+",
+	SUB: "-",
+	MUL: "*",
+	QUO: "/",
+	REM: "%",
+
+	EQL:    "==",
+	NEQ:    "!=",
+	LSS:    "<",
+	GTR:    ">",
+	LEQ:    "<=",
+	GEQ:    ">=",
+	TILDE:  "=~",
+	NTILDE: "!~",
+
+	PIPE:   "|",
+	ASSIGN: "=",
+	COLON:  ":",
+	SEMI:   ";",
+	COMMA:  ",",
+	DOT:    ".",
+	DOTDOT: "..",
+	ARROW:  "=>",
+
+	LPAREN:   "(",
+	RPAREN:   ")",
+	LBRACKET: "[",
+	RBRACKET: "]",
+	LBRACE:   "{",
+	RBRACE:   "}",
+
+	AS:               "as",
+	BY:               "by",
+	CONSUME:          "consume",
+	COUNT:            "count",
+	DISTINCT:         "distinct",
+	EVALUATE:         "evaluate",
+	EXTEND:           "extend",
+	FACET:            "facet",
+	FILTER:           "filter",
+	FIND:             "find",
+	FORK:             "fork",
+	GETSCHEMA:        "getschema",
+	INVOKE:           "invoke",
+	JOIN:             "join",
+	LIMIT:            "limit",
+	LOOKUP:           "lookup",
+	MAKESERIES:       "make-series",
+	MVAPPLY:          "mv-apply",
+	MVEXPAND:         "mv-expand",
+	ORDER:            "order",
+	PARSE:            "parse",
+	PARTITION:        "partition",
+	PRINT:            "print",
+	PROJECT:          "project",
+	PROJECT_AWAY:     "project-away",
+	PROJECT_KEEP:     "project-keep",
+	PROJECT_RENAME:   "project-rename",
+	PROJECT_REORDER:  "project-reorder",
+	RANGE:            "range",
+	REDUCE:           "reduce",
+	RENDER:           "render",
+	SAMPLE:           "sample",
+	SAMPLE_DISTINCT:  "sample-distinct",
+	SCAN:             "scan",
+	SEARCH:           "search",
+	SERIALIZE:        "serialize",
+	SORT:             "sort",
+	SUMMARIZE:        "summarize",
+	TAKE:             "take",
+	TOP:              "top",
+	TOP_HITTERS:      "top-hitters",
+	TOP_NESTED:       "top-nested",
+	UNION:            "union",
+	WHERE:            "where",
+	ALIAS:            "alias",
+	DECLARE:          "declare",
+	LET:              "let",
+	PATTERN:          "pattern",
+	RESTRICT:         "restrict",
+	SET:              "set",
+	ACCESS:           "access",
+	ASC:              "asc",
+	BETWEEN:          "between",
+	DATABASE:         "database",
+	DATASCOPE:        "datascope",
+	DATATABLE:        "datatable",
+	DEFAULT:          "default",
+	DESC:             "desc",
+	EXTERNALDATA:     "externaldata",
+	FIRST:            "first",
+	FROM:             "from",
+	HOTCACHE:         "hotcache",
+	IN:               "in",
+	KIND:             "kind",
+	LAST:             "last",
+	MATERIALIZE:      "materialize",
+	NOOPTIMIZATION:   "nooptimization",
+	NULLS:            "nulls",
+	OF:               "of",
+	ON:               "on",
+	STEP:             "step",
+	TO:               "to",
+	TOSCALAR:         "toscalar",
+	TOTABLE:          "totable",
+	VIEW:             "view",
+	WITH:             "with",
+	WITHSOURCE:       "withsource",
+	AND:              "and",
+	NOT:              "not",
+	OR:               "or",
+	BOOL_TYPE:        "bool",
+	DATETIME_TYPE:    "datetime",
+	DECIMAL_TYPE:     "decimal",
+	DYNAMIC_TYPE:     "dynamic",
+	GUID_TYPE:        "guid",
+	INT_TYPE:         "int",
+	LONG_TYPE:        "long",
+	REAL_TYPE:        "real",
+	STRING_TYPE:      "string",
+	TIMESPAN_TYPE:    "timespan",
+	CONTAINS:         "contains",
+	CONTAINS_CS:      "contains_cs",
+	ENDSWITH:         "endswith",
+	ENDSWITH_CS:      "endswith_cs",
+	HAS:              "has",
+	HAS_ALL:          "has_all",
+	HAS_ANY:          "has_any",
+	HAS_CS:           "has_cs",
+	HASPREFIX:        "hasprefix",
+	HASPREFIX_CS:     "hasprefix_cs",
+	HASSUFFIX:        "hassuffix",
+	HASSUFFIX_CS:     "hassuffix_cs",
+	LIKE:             "like",
+	MATCHES_REGEX:    "matches regex",
+	NOTCONTAINS:      "notcontains",
+	NOTCONTAINS_CS:   "notcontains_cs",
+	STARTSWITH:       "startswith",
+	STARTSWITH_CS:    "startswith_cs",
+	CLUSTER:          "cluster",
+	NULL:             "null",
+	PACK:             "pack",
+	TYPEOF:           "typeof",
+}
+
+// String returns the string representation of the token.
+func (t Token) String() string {
+	if 0 <= t && int(t) < len(tokenStrings) {
+		s := tokenStrings[t]
+		if s != "" {
+			return s
+		}
+	}
+	return "token(" + strconv.Itoa(int(t)) + ")"
+}
+
+// IsLiteral reports whether the token is a literal.
+func (t Token) IsLiteral() bool {
+	return literalBeg < t && t < literalEnd
+}
+
+// IsOperator reports whether the token is an operator or delimiter.
+func (t Token) IsOperator() bool {
+	return operatorBeg < t && t < operatorEnd
+}
+
+// IsKeyword reports whether the token is a keyword.
+func (t Token) IsKeyword() bool {
+	return keywordBeg < t && t < keywordEnd
+}
+
+// keywords maps keyword strings to token types.
+var keywords map[string]Token
+
+func init() {
+	keywords = make(map[string]Token, keywordEnd-keywordBeg)
+	for t := keywordBeg + 1; t < keywordEnd; t++ {
+		keywords[tokenStrings[t]] = t
+	}
+	// Add alternative spellings
+	keywords["mvapply"] = MVAPPLY
+	keywords["mvexpand"] = MVEXPAND
+	keywords["external_data"] = EXTERNALDATA
+	keywords["with_source"] = WITHSOURCE
+	keywords["boolean"] = BOOL_TYPE
+	keywords["date"] = DATETIME_TYPE
+	keywords["time"] = TIMESPAN_TYPE
+	keywords["int64"] = LONG_TYPE
+	keywords["!contains"] = NOTCONTAINS
+	keywords["!contains_cs"] = NOTCONTAINS_CS
+	keywords["!has"] = HAS    // Maps to HAS but parser needs to check for !
+	keywords["!between"] = BETWEEN // Maps to BETWEEN but parser needs to check for !
+}
+
+// Lookup returns the token type for the given identifier.
+// If the identifier is a keyword, the corresponding keyword token is returned.
+// Otherwise, IDENT is returned.
+func Lookup(ident string) Token {
+	if tok, ok := keywords[ident]; ok {
+		return tok
+	}
+	return IDENT
+}
+
+// Precedence returns the operator precedence for binary operators.
+// Returns 0 for non-binary operators.
+func (t Token) Precedence() int {
+	switch t {
+	case OR:
+		return 1
+	case AND:
+		return 2
+	case EQL, NEQ, LSS, GTR, LEQ, GEQ, TILDE, NTILDE,
+		CONTAINS, CONTAINS_CS, NOTCONTAINS, NOTCONTAINS_CS,
+		STARTSWITH, STARTSWITH_CS, ENDSWITH, ENDSWITH_CS,
+		HAS, HAS_CS, HAS_ALL, HAS_ANY,
+		HASPREFIX, HASPREFIX_CS, HASSUFFIX, HASSUFFIX_CS,
+		LIKE, MATCHES_REGEX, BETWEEN, IN:
+		return 3
+	case ADD, SUB:
+		return 4
+	case MUL, QUO, REM:
+		return 5
+	default:
+		return 0
+	}
+}
+
