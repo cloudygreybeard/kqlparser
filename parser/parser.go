@@ -240,11 +240,11 @@ func (p *Parser) parseCompareExpr() ast.Expr {
 	switch p.tok {
 	case token.EQL, token.NEQ, token.LSS, token.GTR, token.LEQ, token.GEQ,
 		token.TILDE, token.NTILDE,
-		token.CONTAINS, token.CONTAINS_CS, token.NOTCONTAINS, token.NOTCONTAINS_CS,
-		token.STARTSWITH, token.STARTSWITH_CS, token.ENDSWITH, token.ENDSWITH_CS,
-		token.HAS, token.HAS_CS, token.HAS_ALL, token.HAS_ANY,
-		token.HASPREFIX, token.HASPREFIX_CS, token.HASSUFFIX, token.HASSUFFIX_CS,
-		token.LIKE, token.MATCHES_REGEX:
+		token.CONTAINS, token.CONTAINSCS, token.NOTCONTAINS, token.NOTCONTAINSCS,
+		token.STARTSWITH, token.STARTSWITHCS, token.ENDSWITH, token.ENDSWITHCS,
+		token.HAS, token.HASCS, token.HASALL, token.HASANY,
+		token.HASPREFIX, token.HASPREFIXCS, token.HASSUFFIX, token.HASSUFFIXCS,
+		token.LIKE, token.MATCHESREGEX:
 		opPos := p.pos
 		op := p.tok
 		p.next()
@@ -416,7 +416,7 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 		p.next()
 		return &ast.StarExpr{Star: pos}
 
-	case token.DYNAMIC_TYPE:
+	case token.DYNAMICTYPE:
 		return p.parseDynamicLit()
 
 	case token.DATATABLE:
@@ -427,9 +427,9 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 		return p.parseIdent()
 
 	// Type keywords used as function names
-	case token.DATETIME_TYPE, token.TIMESPAN_TYPE, token.GUID_TYPE,
-		token.LONG_TYPE, token.INT_TYPE, token.REAL_TYPE, token.STRING_TYPE,
-		token.BOOL_TYPE:
+	case token.DATETIMETYPE, token.TIMESPANTYPE, token.GUIDTYPE,
+		token.LONGTYPE, token.INTTYPE, token.REALTYPE, token.STRINGTYPE,
+		token.BOOLTYPE:
 		return p.parseIdent()
 
 	case token.EOF:
@@ -612,11 +612,11 @@ func (p *Parser) continueBinaryExpr(left ast.Expr) ast.Expr {
 	switch p.tok {
 	case token.EQL, token.NEQ, token.LSS, token.GTR, token.LEQ, token.GEQ,
 		token.TILDE, token.NTILDE,
-		token.CONTAINS, token.CONTAINS_CS, token.NOTCONTAINS, token.NOTCONTAINS_CS,
-		token.STARTSWITH, token.STARTSWITH_CS, token.ENDSWITH, token.ENDSWITH_CS,
-		token.HAS, token.HAS_CS, token.HAS_ALL, token.HAS_ANY,
-		token.HASPREFIX, token.HASPREFIX_CS, token.HASSUFFIX, token.HASSUFFIX_CS,
-		token.LIKE, token.MATCHES_REGEX:
+		token.CONTAINS, token.CONTAINSCS, token.NOTCONTAINS, token.NOTCONTAINSCS,
+		token.STARTSWITH, token.STARTSWITHCS, token.ENDSWITH, token.ENDSWITHCS,
+		token.HAS, token.HASCS, token.HASALL, token.HASANY,
+		token.HASPREFIX, token.HASPREFIXCS, token.HASSUFFIX, token.HASSUFFIXCS,
+		token.LIKE, token.MATCHESREGEX:
 		opPos := p.pos
 		op := p.tok
 		p.next()

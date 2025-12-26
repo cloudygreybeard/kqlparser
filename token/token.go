@@ -14,16 +14,16 @@ const (
 
 	literalBeg
 	// Literals
-	IDENT      // identifier
-	INT        // 123, 0x1F
-	REAL       // 1.23, 1.23e10
-	STRING     // "abc", 'abc', @"abc"
-	DATETIME   // datetime(2023-01-01)
-	TIMESPAN   // 1d, 2h, 3m, timespan(1.02:03:04)
-	GUID       // guid(...)
-	BOOL       // true, false
-	DYNAMIC    // dynamic([1,2,3])
-	TYPE       // typeof(string)
+	IDENT    // identifier
+	INT      // 123, 0x1F
+	REAL     // 1.23, 1.23e10
+	STRING   // "abc", 'abc', @"abc"
+	DATETIME // datetime(2023-01-01)
+	TIMESPAN // 1d, 2h, 3m, timespan(1.02:03:04)
+	GUID     // guid(...)
+	BOOL     // true, false
+	DYNAMIC  // dynamic([1,2,3])
+	TYPE     // typeof(string)
 	literalEnd
 
 	operatorBeg
@@ -86,15 +86,15 @@ const (
 	PARTITION
 	PRINT
 	PROJECT
-	PROJECT_AWAY
-	PROJECT_KEEP
-	PROJECT_RENAME
-	PROJECT_REORDER
+	PROJECTAWAY
+	PROJECTKEEP
+	PROJECTRENAME
+	PROJECTREORDER
 	RANGE
 	REDUCE
 	RENDER
 	SAMPLE
-	SAMPLE_DISTINCT
+	SAMPLEDISTINCT
 	SCAN
 	SEARCH
 	SERIALIZE
@@ -102,8 +102,8 @@ const (
 	SUMMARIZE
 	TAKE
 	TOP
-	TOP_HITTERS
-	TOP_NESTED
+	TOPHITTERS
+	TOPNESTED
 	UNION
 	WHERE
 
@@ -150,36 +150,36 @@ const (
 	OR
 
 	// Keywords - Types
-	BOOL_TYPE
-	DATETIME_TYPE
-	DECIMAL_TYPE
-	DYNAMIC_TYPE
-	GUID_TYPE
-	INT_TYPE
-	LONG_TYPE
-	REAL_TYPE
-	STRING_TYPE
-	TIMESPAN_TYPE
+	BOOLTYPE
+	DATETIMETYPE
+	DECIMALTYPE
+	DYNAMICTYPE
+	GUIDTYPE
+	INTTYPE
+	LONGTYPE
+	REALTYPE
+	STRINGTYPE
+	TIMESPANTYPE
 
 	// Keywords - String operators
 	CONTAINS
-	CONTAINS_CS
+	CONTAINSCS
 	ENDSWITH
-	ENDSWITH_CS
+	ENDSWITHCS
 	HAS
-	HAS_ALL
-	HAS_ANY
-	HAS_CS
+	HASALL
+	HASANY
+	HASCS
 	HASPREFIX
-	HASPREFIX_CS
+	HASPREFIXCS
 	HASSUFFIX
-	HASSUFFIX_CS
+	HASSUFFIXCS
 	LIKE
-	MATCHES_REGEX
+	MATCHESREGEX
 	NOTCONTAINS
-	NOTCONTAINS_CS
+	NOTCONTAINSCS
 	STARTSWITH
-	STARTSWITH_CS
+	STARTSWITHCS
 
 	// Keywords - Misc
 	CLUSTER
@@ -236,118 +236,118 @@ var tokenStrings = [...]string{
 	LBRACE:   "{",
 	RBRACE:   "}",
 
-	AS:               "as",
-	BY:               "by",
-	CONSUME:          "consume",
-	COUNT:            "count",
-	DISTINCT:         "distinct",
-	EVALUATE:         "evaluate",
-	EXTEND:           "extend",
-	FACET:            "facet",
-	FILTER:           "filter",
-	FIND:             "find",
-	FORK:             "fork",
-	GETSCHEMA:        "getschema",
-	INVOKE:           "invoke",
-	JOIN:             "join",
-	LIMIT:            "limit",
-	LOOKUP:           "lookup",
-	MAKESERIES:       "make-series",
-	MVAPPLY:          "mv-apply",
-	MVEXPAND:         "mv-expand",
-	ORDER:            "order",
-	PARSE:            "parse",
-	PARTITION:        "partition",
-	PRINT:            "print",
-	PROJECT:          "project",
-	PROJECT_AWAY:     "project-away",
-	PROJECT_KEEP:     "project-keep",
-	PROJECT_RENAME:   "project-rename",
-	PROJECT_REORDER:  "project-reorder",
-	RANGE:            "range",
-	REDUCE:           "reduce",
-	RENDER:           "render",
-	SAMPLE:           "sample",
-	SAMPLE_DISTINCT:  "sample-distinct",
-	SCAN:             "scan",
-	SEARCH:           "search",
-	SERIALIZE:        "serialize",
-	SORT:             "sort",
-	SUMMARIZE:        "summarize",
-	TAKE:             "take",
-	TOP:              "top",
-	TOP_HITTERS:      "top-hitters",
-	TOP_NESTED:       "top-nested",
-	UNION:            "union",
-	WHERE:            "where",
-	ALIAS:            "alias",
-	DECLARE:          "declare",
-	LET:              "let",
-	PATTERN:          "pattern",
-	RESTRICT:         "restrict",
-	SET:              "set",
-	ACCESS:           "access",
-	ASC:              "asc",
-	BETWEEN:          "between",
-	DATABASE:         "database",
-	DATASCOPE:        "datascope",
-	DATATABLE:        "datatable",
-	DEFAULT:          "default",
-	DESC:             "desc",
-	EXTERNALDATA:     "externaldata",
-	FIRST:            "first",
-	FROM:             "from",
-	HOTCACHE:         "hotcache",
-	IN:               "in",
-	KIND:             "kind",
-	LAST:             "last",
-	MATERIALIZE:      "materialize",
-	NOOPTIMIZATION:   "nooptimization",
-	NULLS:            "nulls",
-	OF:               "of",
-	ON:               "on",
-	STEP:             "step",
-	TO:               "to",
-	TOSCALAR:         "toscalar",
-	TOTABLE:          "totable",
-	VIEW:             "view",
-	WITH:             "with",
-	WITHSOURCE:       "withsource",
-	AND:              "and",
-	NOT:              "not",
-	OR:               "or",
-	BOOL_TYPE:        "bool",
-	DATETIME_TYPE:    "datetime",
-	DECIMAL_TYPE:     "decimal",
-	DYNAMIC_TYPE:     "dynamic",
-	GUID_TYPE:        "guid",
-	INT_TYPE:         "int",
-	LONG_TYPE:        "long",
-	REAL_TYPE:        "real",
-	STRING_TYPE:      "string",
-	TIMESPAN_TYPE:    "timespan",
-	CONTAINS:         "contains",
-	CONTAINS_CS:      "contains_cs",
-	ENDSWITH:         "endswith",
-	ENDSWITH_CS:      "endswith_cs",
-	HAS:              "has",
-	HAS_ALL:          "has_all",
-	HAS_ANY:          "has_any",
-	HAS_CS:           "has_cs",
-	HASPREFIX:        "hasprefix",
-	HASPREFIX_CS:     "hasprefix_cs",
-	HASSUFFIX:        "hassuffix",
-	HASSUFFIX_CS:     "hassuffix_cs",
-	LIKE:             "like",
-	MATCHES_REGEX:    "matches regex",
-	NOTCONTAINS:      "notcontains",
-	NOTCONTAINS_CS:   "notcontains_cs",
-	STARTSWITH:       "startswith",
-	STARTSWITH_CS:    "startswith_cs",
-	CLUSTER:          "cluster",
-	NULL:             "null",
-	PACK:             "pack",
-	TYPEOF:           "typeof",
+	AS:             "as",
+	BY:             "by",
+	CONSUME:        "consume",
+	COUNT:          "count",
+	DISTINCT:       "distinct",
+	EVALUATE:       "evaluate",
+	EXTEND:         "extend",
+	FACET:          "facet",
+	FILTER:         "filter",
+	FIND:           "find",
+	FORK:           "fork",
+	GETSCHEMA:      "getschema",
+	INVOKE:         "invoke",
+	JOIN:           "join",
+	LIMIT:          "limit",
+	LOOKUP:         "lookup",
+	MAKESERIES:     "make-series",
+	MVAPPLY:        "mv-apply",
+	MVEXPAND:       "mv-expand",
+	ORDER:          "order",
+	PARSE:          "parse",
+	PARTITION:      "partition",
+	PRINT:          "print",
+	PROJECT:        "project",
+	PROJECTAWAY:    "project-away",
+	PROJECTKEEP:    "project-keep",
+	PROJECTRENAME:  "project-rename",
+	PROJECTREORDER: "project-reorder",
+	RANGE:          "range",
+	REDUCE:         "reduce",
+	RENDER:         "render",
+	SAMPLE:         "sample",
+	SAMPLEDISTINCT: "sample-distinct",
+	SCAN:           "scan",
+	SEARCH:         "search",
+	SERIALIZE:      "serialize",
+	SORT:           "sort",
+	SUMMARIZE:      "summarize",
+	TAKE:           "take",
+	TOP:            "top",
+	TOPHITTERS:     "top-hitters",
+	TOPNESTED:      "top-nested",
+	UNION:          "union",
+	WHERE:          "where",
+	ALIAS:          "alias",
+	DECLARE:        "declare",
+	LET:            "let",
+	PATTERN:        "pattern",
+	RESTRICT:       "restrict",
+	SET:            "set",
+	ACCESS:         "access",
+	ASC:            "asc",
+	BETWEEN:        "between",
+	DATABASE:       "database",
+	DATASCOPE:      "datascope",
+	DATATABLE:      "datatable",
+	DEFAULT:        "default",
+	DESC:           "desc",
+	EXTERNALDATA:   "externaldata",
+	FIRST:          "first",
+	FROM:           "from",
+	HOTCACHE:       "hotcache",
+	IN:             "in",
+	KIND:           "kind",
+	LAST:           "last",
+	MATERIALIZE:    "materialize",
+	NOOPTIMIZATION: "nooptimization",
+	NULLS:          "nulls",
+	OF:             "of",
+	ON:             "on",
+	STEP:           "step",
+	TO:             "to",
+	TOSCALAR:       "toscalar",
+	TOTABLE:        "totable",
+	VIEW:           "view",
+	WITH:           "with",
+	WITHSOURCE:     "withsource",
+	AND:            "and",
+	NOT:            "not",
+	OR:             "or",
+	BOOLTYPE:       "bool",
+	DATETIMETYPE:   "datetime",
+	DECIMALTYPE:    "decimal",
+	DYNAMICTYPE:    "dynamic",
+	GUIDTYPE:       "guid",
+	INTTYPE:        "int",
+	LONGTYPE:       "long",
+	REALTYPE:       "real",
+	STRINGTYPE:     "string",
+	TIMESPANTYPE:   "timespan",
+	CONTAINS:       "contains",
+	CONTAINSCS:     "contains_cs",
+	ENDSWITH:       "endswith",
+	ENDSWITHCS:     "endswith_cs",
+	HAS:            "has",
+	HASALL:         "has_all",
+	HASANY:         "has_any",
+	HASCS:          "has_cs",
+	HASPREFIX:      "hasprefix",
+	HASPREFIXCS:    "hasprefix_cs",
+	HASSUFFIX:      "hassuffix",
+	HASSUFFIXCS:    "hassuffix_cs",
+	LIKE:           "like",
+	MATCHESREGEX:   "matches regex",
+	NOTCONTAINS:    "notcontains",
+	NOTCONTAINSCS:  "notcontains_cs",
+	STARTSWITH:     "startswith",
+	STARTSWITHCS:   "startswith_cs",
+	CLUSTER:        "cluster",
+	NULL:           "null",
+	PACK:           "pack",
+	TYPEOF:         "typeof",
 }
 
 // String returns the string representation of the token.
@@ -389,13 +389,13 @@ func init() {
 	keywords["mvexpand"] = MVEXPAND
 	keywords["external_data"] = EXTERNALDATA
 	keywords["with_source"] = WITHSOURCE
-	keywords["boolean"] = BOOL_TYPE
-	keywords["date"] = DATETIME_TYPE
-	keywords["time"] = TIMESPAN_TYPE
-	keywords["int64"] = LONG_TYPE
+	keywords["boolean"] = BOOLTYPE
+	keywords["date"] = DATETIMETYPE
+	keywords["time"] = TIMESPANTYPE
+	keywords["int64"] = LONGTYPE
 	keywords["!contains"] = NOTCONTAINS
-	keywords["!contains_cs"] = NOTCONTAINS_CS
-	keywords["!has"] = HAS    // Maps to HAS but parser needs to check for !
+	keywords["!contains_cs"] = NOTCONTAINSCS
+	keywords["!has"] = HAS     // Maps to HAS but parser needs to check for !
 	keywords["!between"] = BETWEEN // Maps to BETWEEN but parser needs to check for !
 }
 
@@ -418,11 +418,11 @@ func (t Token) Precedence() int {
 	case AND:
 		return 2
 	case EQL, NEQ, LSS, GTR, LEQ, GEQ, TILDE, NTILDE,
-		CONTAINS, CONTAINS_CS, NOTCONTAINS, NOTCONTAINS_CS,
-		STARTSWITH, STARTSWITH_CS, ENDSWITH, ENDSWITH_CS,
-		HAS, HAS_CS, HAS_ALL, HAS_ANY,
-		HASPREFIX, HASPREFIX_CS, HASSUFFIX, HASSUFFIX_CS,
-		LIKE, MATCHES_REGEX, BETWEEN, IN:
+		CONTAINS, CONTAINSCS, NOTCONTAINS, NOTCONTAINSCS,
+		STARTSWITH, STARTSWITHCS, ENDSWITH, ENDSWITHCS,
+		HAS, HASCS, HASALL, HASANY,
+		HASPREFIX, HASPREFIXCS, HASSUFFIX, HASSUFFIXCS,
+		LIKE, MATCHESREGEX, BETWEEN, IN:
 		return 3
 	case ADD, SUB:
 		return 4
@@ -432,4 +432,3 @@ func (t Token) Precedence() int {
 		return 0
 	}
 }
-

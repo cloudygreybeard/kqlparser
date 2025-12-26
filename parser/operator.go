@@ -15,7 +15,7 @@ func (p *Parser) parseOperator() ast.Operator {
 		return p.parseWhereOp(pipePos)
 	case token.PROJECT:
 		return p.parseProjectOp(pipePos)
-	case token.PROJECT_AWAY:
+	case token.PROJECTAWAY:
 		return p.parseProjectAwayOp(pipePos)
 	case token.EXTEND:
 		return p.parseExtendOp(pipePos)

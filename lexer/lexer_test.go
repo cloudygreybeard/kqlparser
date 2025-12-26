@@ -18,7 +18,7 @@ func TestScanTokens(t *testing.T) {
 		{"summarize", []token.Token{token.SUMMARIZE, token.EOF}},
 
 		// Hyphenated keywords
-		{"project-away", []token.Token{token.PROJECT_AWAY, token.EOF}},
+		{"project-away", []token.Token{token.PROJECTAWAY, token.EOF}},
 		{"make-series", []token.Token{token.MAKESERIES, token.EOF}},
 		{"mv-expand", []token.Token{token.MVEXPAND, token.EOF}},
 
@@ -168,7 +168,7 @@ func TestMatchesRegex(t *testing.T) {
 		lit string
 	}{
 		{token.IDENT, "x"},
-		{token.MATCHES_REGEX, "matches regex"},
+		{token.MATCHESREGEX, "matches regex"},
 		{token.IDENT, "y"},
 		{token.EOF, ""},
 	}

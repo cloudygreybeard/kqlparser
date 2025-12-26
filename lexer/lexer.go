@@ -209,7 +209,7 @@ func (l *Lexer) scanIdentifier(pos token.Pos) Token {
 
 	// Handle "matches regex" (two-word keyword)
 	if lit == "matches" && l.skipSpacesAndCheck("regex") {
-		return Token{Type: token.MATCHES_REGEX, Pos: pos, Lit: "matches regex"}
+		return Token{Type: token.MATCHESREGEX, Pos: pos, Lit: "matches regex"}
 	}
 
 	return Token{Type: tok, Pos: pos, Lit: lit}
