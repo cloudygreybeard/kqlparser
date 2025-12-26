@@ -300,4 +300,3 @@ func (s *ClusterSymbol) Database(name string) *DatabaseSymbol {
 	}
 	return nil
 }
-

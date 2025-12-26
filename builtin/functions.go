@@ -304,4 +304,3 @@ func DefaultScope() *symbol.Scope {
 	}
 	return scope
 }
-

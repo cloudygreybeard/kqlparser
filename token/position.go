@@ -149,4 +149,3 @@ func (f *File) LineStart(line int) Pos {
 	}
 	return Pos(f.lines[line-1] + 1)
 }
-

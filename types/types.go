@@ -53,10 +53,10 @@ type Scalar struct {
 	kind Kind
 }
 
-func (t *Scalar) String() string     { return t.kind.String() }
-func (t *Scalar) Underlying() Type   { return t }
-func (t *Scalar) isType()            {}
-func (t *Scalar) Kind() Kind         { return t.kind }
+func (t *Scalar) String() string   { return t.kind.String() }
+func (t *Scalar) Underlying() Type { return t }
+func (t *Scalar) isType()          {}
+func (t *Scalar) Kind() Kind       { return t.kind }
 
 // Predefined scalar types
 var (
@@ -134,10 +134,10 @@ type Unknown struct {
 	reason string
 }
 
-func (t *Unknown) String() string     { return "unknown" }
-func (t *Unknown) Underlying() Type   { return t }
-func (t *Unknown) isType()            {}
-func (t *Unknown) Reason() string     { return t.reason }
+func (t *Unknown) String() string   { return "unknown" }
+func (t *Unknown) Underlying() Type { return t }
+func (t *Unknown) isType()          {}
+func (t *Unknown) Reason() string   { return t.reason }
 
 // Typ_Unknown is the singleton unknown type.
 var Typ_Unknown = &Unknown{reason: "unknown"}
@@ -200,17 +200,17 @@ func Compatible(a, b Type) bool {
 	if IsDynamic(a) || IsDynamic(b) {
 		return true
 	}
-	
+
 	// Same type is always compatible
 	if Equal(a, b) {
 		return true
 	}
-	
+
 	// Numeric types are compatible with each other
 	if IsNumeric(a) && IsNumeric(b) {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -253,12 +253,12 @@ func CommonType(a, b Type) Type {
 	if Equal(a, b) {
 		return a
 	}
-	
+
 	// Dynamic absorbs everything
 	if IsDynamic(a) || IsDynamic(b) {
 		return Typ_Dynamic
 	}
-	
+
 	// Numeric promotion
 	if IsNumeric(a) && IsNumeric(b) {
 		// Promote to the "larger" type
@@ -274,7 +274,6 @@ func CommonType(a, b Type) Type {
 		}
 		return Typ_Int
 	}
-	
+
 	return Typ_Unknown
 }
-

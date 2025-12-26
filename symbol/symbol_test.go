@@ -158,4 +158,3 @@ func TestClusterSymbol(t *testing.T) {
 		t.Error("Expected to find 'StormEvents' table")
 	}
 }
-

@@ -65,10 +65,10 @@ func (x *BinaryExpr) End() token.Pos { return x.Y.End() }
 
 // CallExpr represents a function call expression.
 type CallExpr struct {
-	Fun    Expr        // Function expression
-	Lparen token.Pos   // Position of "("
-	Args   []Expr      // Function arguments
-	Rparen token.Pos   // Position of ")"
+	Fun    Expr      // Function expression
+	Lparen token.Pos // Position of "("
+	Args   []Expr    // Function arguments
+	Rparen token.Pos // Position of ")"
 }
 
 func (x *CallExpr) Pos() token.Pos { return x.Fun.Pos() }
@@ -87,9 +87,9 @@ func (x *IndexExpr) End() token.Pos { return x.Rbracket + 1 }
 
 // SelectorExpr represents a selector expression (a.b).
 type SelectorExpr struct {
-	X   Expr   // Expression
+	X   Expr      // Expression
 	Dot token.Pos // Position of "."
-	Sel *Ident // Selector
+	Sel *Ident    // Selector
 }
 
 func (x *SelectorExpr) Pos() token.Pos { return x.X.Pos() }
@@ -107,13 +107,13 @@ func (x *ListExpr) End() token.Pos { return x.Rparen + 1 }
 
 // BetweenExpr represents a between expression (x between (a .. b)).
 type BetweenExpr struct {
-	X      Expr        // Value to test
-	OpPos  token.Pos   // Position of "between" or "!between"
-	Not    bool        // True for !between
-	Lparen token.Pos   // Position of "("
-	Low    Expr        // Low bound
-	High   Expr        // High bound
-	Rparen token.Pos   // Position of ")"
+	X      Expr      // Value to test
+	OpPos  token.Pos // Position of "between" or "!between"
+	Not    bool      // True for !between
+	Lparen token.Pos // Position of "("
+	Low    Expr      // Low bound
+	High   Expr      // High bound
+	Rparen token.Pos // Position of ")"
 }
 
 func (x *BetweenExpr) Pos() token.Pos { return x.X.Pos() }
@@ -168,4 +168,3 @@ func (x *PipeExpr) End() token.Pos {
 	}
 	return x.Source.End()
 }
-

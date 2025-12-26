@@ -197,4 +197,3 @@ func (f inspector) Visit(node Node) Visitor {
 	}
 	return nil
 }
-

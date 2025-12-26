@@ -183,4 +183,3 @@ func TestMatchesRegex(t *testing.T) {
 		}
 	}
 }
-

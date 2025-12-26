@@ -469,4 +469,3 @@ func isDigit(ch rune) bool {
 func isHexDigit(ch rune) bool {
 	return isDigit(ch) || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
 }
-

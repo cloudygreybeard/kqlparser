@@ -84,6 +84,11 @@ func (p *Parser) Errors() ErrorList {
 	return all
 }
 
+// File returns the source file for position information.
+func (p *Parser) File() *token.File {
+	return p.file
+}
+
 // next advances to the next token.
 func (p *Parser) next() {
 	t := p.lex.Scan()

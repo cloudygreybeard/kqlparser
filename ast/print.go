@@ -222,4 +222,3 @@ func (p *printer) print(node Node, level int) {
 		p.printf("%T{...}\n", node)
 	}
 }
-

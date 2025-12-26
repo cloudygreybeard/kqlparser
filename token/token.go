@@ -395,7 +395,7 @@ func init() {
 	keywords["int64"] = LONGTYPE
 	keywords["!contains"] = NOTCONTAINS
 	keywords["!contains_cs"] = NOTCONTAINSCS
-	keywords["!has"] = HAS     // Maps to HAS but parser needs to check for !
+	keywords["!has"] = HAS         // Maps to HAS but parser needs to check for !
 	keywords["!between"] = BETWEEN // Maps to BETWEEN but parser needs to check for !
 }
 

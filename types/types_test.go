@@ -70,8 +70,8 @@ func TestTabularType(t *testing.T) {
 
 func TestIsNumeric(t *testing.T) {
 	tests := []struct {
-		typ    Type
-		want   bool
+		typ  Type
+		want bool
 	}{
 		{Typ_Int, true},
 		{Typ_Long, true},
@@ -166,4 +166,3 @@ func TestCommonType(t *testing.T) {
 		}
 	}
 }
-

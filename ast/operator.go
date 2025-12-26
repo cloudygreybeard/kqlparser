@@ -64,11 +64,11 @@ func (x *ExtendOp) End() token.Pos {
 
 // SummarizeOp represents a summarize operator.
 type SummarizeOp struct {
-	Pipe        token.Pos    // Position of "|"
-	Summarize   token.Pos    // Position of "summarize"
-	Aggregates  []*NamedExpr // Aggregate expressions
-	ByPos       token.Pos    // Position of "by" (NoPos if no by clause)
-	GroupBy     []*NamedExpr // Group by expressions
+	Pipe       token.Pos    // Position of "|"
+	Summarize  token.Pos    // Position of "summarize"
+	Aggregates []*NamedExpr // Aggregate expressions
+	ByPos      token.Pos    // Position of "by" (NoPos if no by clause)
+	GroupBy    []*NamedExpr // Group by expressions
 }
 
 func (x *SummarizeOp) Pos() token.Pos { return x.Pipe }
@@ -85,9 +85,9 @@ func (x *SummarizeOp) End() token.Pos {
 
 // SortOp represents a sort/order operator.
 type SortOp struct {
-	Pipe   token.Pos   // Position of "|"
-	Sort   token.Pos   // Position of "sort" or "order"
-	ByPos  token.Pos   // Position of "by"
+	Pipe   token.Pos    // Position of "|"
+	Sort   token.Pos    // Position of "sort" or "order"
+	ByPos  token.Pos    // Position of "by"
 	Orders []*OrderExpr // Ordered expressions
 }
 
@@ -122,11 +122,11 @@ func (x *TakeOp) End() token.Pos { return x.Count.End() }
 
 // TopOp represents a top operator.
 type TopOp struct {
-	Pipe   token.Pos   // Position of "|"
-	Top    token.Pos   // Position of "top"
-	Count  Expr        // Number of rows
-	ByPos  token.Pos   // Position of "by"
-	ByExpr *OrderExpr  // Expression to order by
+	Pipe   token.Pos  // Position of "|"
+	Top    token.Pos  // Position of "top"
+	Count  Expr       // Number of rows
+	ByPos  token.Pos  // Position of "by"
+	ByExpr *OrderExpr // Expression to order by
 }
 
 func (x *TopOp) Pos() token.Pos { return x.Pipe }
@@ -173,12 +173,12 @@ const (
 
 // JoinOp represents a join operator.
 type JoinOp struct {
-	Pipe   token.Pos   // Position of "|"
-	Join   token.Pos   // Position of "join"
-	Kind   JoinKind    // Join kind
-	Right  Expr        // Right side expression
-	OnPos  token.Pos   // Position of "on"
-	OnExpr []Expr      // Join conditions
+	Pipe   token.Pos // Position of "|"
+	Join   token.Pos // Position of "join"
+	Kind   JoinKind  // Join kind
+	Right  Expr      // Right side expression
+	OnPos  token.Pos // Position of "on"
+	OnExpr []Expr    // Join conditions
 }
 
 func (x *JoinOp) Pos() token.Pos { return x.Pipe }
@@ -247,9 +247,9 @@ func (x *MvExpandOp) End() token.Pos {
 
 // SearchOp represents a search operator.
 type SearchOp struct {
-	Pipe       token.Pos // Position of "|"
-	Search     token.Pos // Position of "search"
-	Predicate  Expr      // Search predicate
+	Pipe      token.Pos // Position of "|"
+	Search    token.Pos // Position of "search"
+	Predicate Expr      // Search predicate
 }
 
 func (x *SearchOp) Pos() token.Pos { return x.Pipe }
@@ -267,4 +267,3 @@ type GenericOp struct {
 
 func (x *GenericOp) Pos() token.Pos { return x.Pipe }
 func (x *GenericOp) End() token.Pos { return x.EndPos }
-

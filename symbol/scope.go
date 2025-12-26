@@ -118,4 +118,3 @@ func RowScopeFromTabular(tab *Tabular, parent *RowScope) *RowScope {
 
 // Tabular is an alias for TableSymbol to make RowScopeFromTabular work.
 type Tabular = TableSymbol
-

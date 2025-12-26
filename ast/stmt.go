@@ -60,4 +60,3 @@ func (x *Script) End() token.Pos {
 	}
 	return token.NoPos
 }
-
