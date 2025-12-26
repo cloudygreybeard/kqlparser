@@ -646,4 +646,3 @@ func (p *Parser) continueBinaryExpr(left ast.Expr) ast.Expr {
 
 	return left
 }
-

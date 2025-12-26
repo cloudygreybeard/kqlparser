@@ -59,7 +59,7 @@ func (p *Parser) parseOperator() ast.Operator {
 // parseWhereOp parses a where operator.
 func (p *Parser) parseWhereOp(pipePos token.Pos) *ast.WhereOp {
 	wherePos := p.pos
-	p.next() // consume 'where' or 'filter'
+	p.next()                         // consume 'where' or 'filter'
 	predicate := p.parseExprNoPipe() // Don't consume following pipes
 	return &ast.WhereOp{Pipe: pipePos, Where: wherePos, Predicate: predicate}
 }
@@ -488,4 +488,3 @@ func (p *Parser) continueParsingExprNoPipe(ident *ast.Ident) ast.Expr {
 	x := p.continuePostfixExpr(ident)
 	return p.continueBinaryExpr(x)
 }
-

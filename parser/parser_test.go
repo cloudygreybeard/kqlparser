@@ -115,9 +115,9 @@ func TestParseCallExpr(t *testing.T) {
 
 func TestParsePipeExpr(t *testing.T) {
 	tests := []struct {
-		src      string
-		opCount  int
-		opTypes  []string
+		src     string
+		opCount int
+		opTypes []string
 	}{
 		{"T | where x > 10", 1, []string{"WhereOp"}},
 		{"T | project a, b", 1, []string{"ProjectOp"}},
@@ -432,4 +432,3 @@ func TestASTPrint(t *testing.T) {
 		t.Errorf("expected WhereOp in output: %s", output)
 	}
 }
-
