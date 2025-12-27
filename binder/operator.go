@@ -43,6 +43,38 @@ func (b *Binder) bindOperator(op ast.Operator, inputType types.Type) types.Type 
 		return b.bindParseOp(o, inputType)
 	case *ast.GenericOp:
 		return b.bindGenericOp(o, inputType)
+	case *ast.ProjectRenameOp:
+		return b.bindProjectRenameOp(o, inputType)
+	case *ast.ProjectReorderOp:
+		return b.bindProjectReorderOp(o, inputType)
+	case *ast.SampleOp:
+		return b.bindSampleOp(o, inputType)
+	case *ast.SampleDistinctOp:
+		return b.bindSampleDistinctOp(o, inputType)
+	case *ast.LookupOp:
+		return b.bindLookupOp(o, inputType)
+	case *ast.MakeSeriesOp:
+		return b.bindMakeSeriesOp(o, inputType)
+	case *ast.AsOp:
+		return b.bindAsOp(o, inputType)
+	case *ast.GetSchemaOp:
+		return b.bindGetSchemaOp(o, inputType)
+	case *ast.SerializeOp:
+		return b.bindSerializeOp(o, inputType)
+	case *ast.InvokeOp:
+		return b.bindInvokeOp(o, inputType)
+	case *ast.ScanOp:
+		return b.bindScanOp(o, inputType)
+	case *ast.ConsumeOp:
+		return b.bindConsumeOp(o, inputType)
+	case *ast.EvaluateOp:
+		return b.bindEvaluateOp(o, inputType)
+	case *ast.ReduceOp:
+		return b.bindReduceOp(o, inputType)
+	case *ast.ForkOp:
+		return b.bindForkOp(o, inputType)
+	case *ast.FacetOp:
+		return b.bindFacetOp(o, inputType)
 	default:
 		return inputType
 	}
@@ -288,4 +320,247 @@ func (b *Binder) updateRowScope(schema *types.Tabular) {
 	for _, col := range schema.Columns {
 		b.rowScope.AddColumn(symbol.NewColumn(col.Name, col.Type))
 	}
+}
+
+// bindProjectRenameOp binds a project-rename operator.
+func (b *Binder) bindProjectRenameOp(op *ast.ProjectRenameOp, inputType types.Type) types.Type {
+	tab, ok := inputType.(*types.Tabular)
+	if !ok {
+		return inputType
+	}
+
+	// Build rename map
+	renames := make(map[string]string)
+	for _, col := range op.Columns {
+		renames[col.OldName.Name] = col.NewName.Name
+	}
+
+	// Apply renames
+	var columns []*types.Column
+	for _, col := range tab.Columns {
+		newName := col.Name
+		if renamed, ok := renames[col.Name]; ok {
+			newName = renamed
+		}
+		columns = append(columns, &types.Column{Name: newName, Type: col.Type})
+	}
+
+	newSchema := types.NewTabular(columns...)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindProjectReorderOp binds a project-reorder operator.
+func (b *Binder) bindProjectReorderOp(op *ast.ProjectReorderOp, inputType types.Type) types.Type {
+	tab, ok := inputType.(*types.Tabular)
+	if !ok {
+		return inputType
+	}
+
+	// Build column lookup
+	colMap := make(map[string]*types.Column)
+	for _, col := range tab.Columns {
+		colMap[col.Name] = col
+	}
+
+	// Reorder: specified columns first, then remaining
+	var columns []*types.Column
+	seen := make(map[string]bool)
+	for _, ident := range op.Columns {
+		if col, ok := colMap[ident.Name]; ok {
+			columns = append(columns, col)
+			seen[ident.Name] = true
+		}
+	}
+	for _, col := range tab.Columns {
+		if !seen[col.Name] {
+			columns = append(columns, col)
+		}
+	}
+
+	newSchema := types.NewTabular(columns...)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindSampleOp binds a sample operator.
+func (b *Binder) bindSampleOp(op *ast.SampleOp, inputType types.Type) types.Type {
+	b.bindExpr(op.Count)
+	return inputType
+}
+
+// bindSampleDistinctOp binds a sample-distinct operator.
+func (b *Binder) bindSampleDistinctOp(op *ast.SampleDistinctOp, inputType types.Type) types.Type {
+	b.bindExpr(op.Count)
+	colType := b.bindExpr(op.Column)
+
+	// Result is single column with distinct values
+	name := ""
+	if ident, ok := op.Column.(*ast.Ident); ok {
+		name = ident.Name
+	}
+	newSchema := types.NewTabular(&types.Column{Name: name, Type: colType})
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindLookupOp binds a lookup operator.
+func (b *Binder) bindLookupOp(op *ast.LookupOp, inputType types.Type) types.Type {
+	rightType := b.bindExpr(op.Table)
+
+	for _, cond := range op.OnExpr {
+		b.bindExpr(cond)
+	}
+
+	// Combine schemas (similar to join)
+	var columns []*types.Column
+	if leftTab, ok := inputType.(*types.Tabular); ok {
+		columns = append(columns, leftTab.Columns...)
+	}
+	if rightTab, ok := rightType.(*types.Tabular); ok {
+		for _, col := range rightTab.Columns {
+			columns = append(columns, col)
+		}
+	}
+
+	newSchema := types.NewTabular(columns...)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindMakeSeriesOp binds a make-series operator.
+func (b *Binder) bindMakeSeriesOp(op *ast.MakeSeriesOp, inputType types.Type) types.Type {
+	var columns []*types.Column
+
+	// Group by columns first
+	for _, gb := range op.GroupBy {
+		colType := b.bindExpr(gb.Expr)
+		name := b.getColumnName(gb)
+		columns = append(columns, &types.Column{Name: name, Type: colType})
+	}
+
+	// On column (time axis)
+	if op.OnColumn != nil {
+		b.bindExpr(op.OnColumn)
+		name := ""
+		if ident, ok := op.OnColumn.(*ast.Ident); ok {
+			name = ident.Name
+		}
+		// Time column becomes array in make-series
+		columns = append(columns, &types.Column{Name: name, Type: types.Typ_Dynamic})
+	}
+
+	// Aggregate columns become arrays
+	for _, agg := range op.Aggregates {
+		b.bindExpr(agg.Expr)
+		name := b.getColumnName(agg)
+		columns = append(columns, &types.Column{Name: name, Type: types.Typ_Dynamic})
+	}
+
+	newSchema := types.NewTabular(columns...)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindAsOp binds an as operator.
+func (b *Binder) bindAsOp(op *ast.AsOp, inputType types.Type) types.Type {
+	// 'as' just names the result, doesn't change schema
+	return inputType
+}
+
+// bindGetSchemaOp binds a getschema operator.
+func (b *Binder) bindGetSchemaOp(op *ast.GetSchemaOp, inputType types.Type) types.Type {
+	// getschema returns schema metadata
+	newSchema := types.NewTabular(
+		&types.Column{Name: "ColumnName", Type: types.Typ_String},
+		&types.Column{Name: "ColumnOrdinal", Type: types.Typ_Long},
+		&types.Column{Name: "DataType", Type: types.Typ_String},
+		&types.Column{Name: "ColumnType", Type: types.Typ_String},
+	)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindSerializeOp binds a serialize operator.
+func (b *Binder) bindSerializeOp(op *ast.SerializeOp, inputType types.Type) types.Type {
+	// Start with existing columns
+	var columns []*types.Column
+	if tab, ok := inputType.(*types.Tabular); ok {
+		columns = append(columns, tab.Columns...)
+	}
+
+	// Add serialized columns
+	for _, col := range op.Columns {
+		colType := b.bindExpr(col.Expr)
+		name := b.getColumnName(col)
+		columns = append(columns, &types.Column{Name: name, Type: colType})
+	}
+
+	newSchema := types.NewTabular(columns...)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindInvokeOp binds an invoke operator.
+func (b *Binder) bindInvokeOp(op *ast.InvokeOp, inputType types.Type) types.Type {
+	b.bindExpr(op.Function)
+	// Invoke calls a stored function - return type depends on function
+	return types.Typ_Unknown
+}
+
+// bindScanOp binds a scan operator.
+func (b *Binder) bindScanOp(op *ast.ScanOp, inputType types.Type) types.Type {
+	for _, step := range op.Steps {
+		b.bindExpr(step)
+	}
+	// Scan is complex - typically preserves schema with added state columns
+	return inputType
+}
+
+// bindConsumeOp binds a consume operator.
+func (b *Binder) bindConsumeOp(op *ast.ConsumeOp, inputType types.Type) types.Type {
+	// Consume returns nothing (forces evaluation)
+	return types.NewTabular()
+}
+
+// bindEvaluateOp binds an evaluate operator.
+func (b *Binder) bindEvaluateOp(op *ast.EvaluateOp, inputType types.Type) types.Type {
+	b.bindExpr(op.Plugin)
+	// Plugin output depends on the specific plugin
+	return types.Typ_Unknown
+}
+
+// bindReduceOp binds a reduce operator.
+func (b *Binder) bindReduceOp(op *ast.ReduceOp, inputType types.Type) types.Type {
+	b.bindExpr(op.Column)
+	// Reduce returns pattern analysis results
+	newSchema := types.NewTabular(
+		&types.Column{Name: "Pattern", Type: types.Typ_String},
+		&types.Column{Name: "Count", Type: types.Typ_Long},
+		&types.Column{Name: "Representative", Type: types.Typ_String},
+	)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindForkOp binds a fork operator.
+func (b *Binder) bindForkOp(op *ast.ForkOp, inputType types.Type) types.Type {
+	// Fork creates multiple result streams - bind each prong
+	for _, prong := range op.Prongs {
+		if prong.Query != nil {
+			b.bindExpr(prong.Query)
+		}
+	}
+	// Fork returns multiple tables - simplified to return input
+	return inputType
+}
+
+// bindFacetOp binds a facet operator.
+func (b *Binder) bindFacetOp(op *ast.FacetOp, inputType types.Type) types.Type {
+	// Bind the with query if present
+	if op.Query != nil {
+		b.bindExpr(op.Query)
+	}
+	// Facet returns multiple tables - one per facet column plus optional with result
+	return inputType
 }

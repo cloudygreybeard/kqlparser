@@ -246,7 +246,7 @@ func TestSymbolResolution(t *testing.T) {
 	}
 
 	result := Bind(script, globals, p.File())
-	
+
 	// Check that symbols were resolved
 	if len(result.Symbols) == 0 {
 		t.Error("expected symbols to be resolved")
@@ -271,7 +271,7 @@ func TestDiagnosticUnresolvedColumn(t *testing.T) {
 
 	opts := &Options{StrictMode: true}
 	result := BindWithOptions(script, globals, p.File(), opts)
-	
+
 	if !result.Diagnostics.HasErrors() {
 		t.Error("expected error for unresolved column")
 	}
@@ -302,7 +302,7 @@ func TestDiagnosticUnresolvedTable(t *testing.T) {
 
 	opts := &Options{StrictMode: true}
 	result := BindWithOptions(script, globals, p.File(), opts)
-	
+
 	if !result.Diagnostics.HasErrors() {
 		t.Error("expected error for unresolved table")
 	}
@@ -318,7 +318,7 @@ func TestDiagnosticUnresolvedFunction(t *testing.T) {
 
 	opts := &Options{StrictMode: true}
 	result := BindWithOptions(script, nil, p.File(), opts)
-	
+
 	if !result.Diagnostics.HasErrors() {
 		t.Error("expected error for unresolved function")
 	}
@@ -346,7 +346,7 @@ func TestDiagnosticWrongArgCount(t *testing.T) {
 
 	opts := &Options{StrictMode: true}
 	result := BindWithOptions(script, nil, p.File(), opts)
-	
+
 	if !result.Diagnostics.HasErrors() {
 		t.Error("expected error for wrong argument count")
 	}
@@ -374,7 +374,7 @@ func TestDiagnosticTypeMismatch(t *testing.T) {
 
 	opts := &Options{StrictMode: true}
 	result := BindWithOptions(script, nil, p.File(), opts)
-	
+
 	if !result.Diagnostics.HasErrors() {
 		t.Error("expected error for type mismatch")
 	}
@@ -402,7 +402,7 @@ func TestDiagnosticInvalidOperand(t *testing.T) {
 
 	opts := &Options{StrictMode: true}
 	result := BindWithOptions(script, nil, p.File(), opts)
-	
+
 	if !result.Diagnostics.HasErrors() {
 		t.Error("expected error for invalid operand")
 	}
@@ -430,8 +430,130 @@ func TestPermissiveModeNoDiagnostics(t *testing.T) {
 
 	// Permissive mode (default)
 	result := Bind(script, nil, p.File())
-	
+
 	if result.Diagnostics.HasErrors() {
 		t.Errorf("expected no errors in permissive mode, got: %v", result.Diagnostics)
+	}
+}
+
+// New operator tests
+
+func TestBindProjectRename(t *testing.T) {
+	globals := DefaultGlobals()
+	globals.Database = symbol.NewDatabase("TestDB")
+	globals.Database.AddTable(symbol.NewTable("T",
+		types.NewColumn("OldName", types.Typ_String),
+		types.NewColumn("Value", types.Typ_Long),
+	))
+
+	src := `T | project-rename NewName = OldName`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	result := Bind(script, globals, p.File())
+	tab, ok := result.ResultType.(*types.Tabular)
+	if !ok {
+		t.Fatalf("expected tabular result, got %T", result.ResultType)
+	}
+
+	// Check column was renamed
+	if col := tab.Column("NewName"); col == nil {
+		t.Error("expected column 'NewName' after rename")
+	}
+	if col := tab.Column("OldName"); col != nil {
+		t.Error("expected 'OldName' to be renamed")
+	}
+}
+
+func TestBindGetSchema(t *testing.T) {
+	globals := DefaultGlobals()
+	globals.Database = symbol.NewDatabase("TestDB")
+	globals.Database.AddTable(symbol.NewTable("T",
+		types.NewColumn("A", types.Typ_String),
+	))
+
+	src := `T | getschema`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	result := Bind(script, globals, p.File())
+	tab, ok := result.ResultType.(*types.Tabular)
+	if !ok {
+		t.Fatalf("expected tabular result, got %T", result.ResultType)
+	}
+
+	// getschema returns schema metadata columns
+	if col := tab.Column("ColumnName"); col == nil {
+		t.Error("expected ColumnName in getschema result")
+	}
+	if col := tab.Column("DataType"); col == nil {
+		t.Error("expected DataType in getschema result")
+	}
+}
+
+func TestBindSerialize(t *testing.T) {
+	globals := DefaultGlobals()
+	globals.Database = symbol.NewDatabase("TestDB")
+	globals.Database.AddTable(symbol.NewTable("T",
+		types.NewColumn("A", types.Typ_Long),
+	))
+
+	src := `T | serialize RowNum = row_number()`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	result := Bind(script, globals, p.File())
+	tab, ok := result.ResultType.(*types.Tabular)
+	if !ok {
+		t.Fatalf("expected tabular result, got %T", result.ResultType)
+	}
+
+	// Should have original column plus new one
+	if len(tab.Columns) < 2 {
+		t.Errorf("expected at least 2 columns, got %d", len(tab.Columns))
+	}
+}
+
+func TestBindSample(t *testing.T) {
+	src := `T | sample 10`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	result := Bind(script, nil, p.File())
+	// Sample preserves schema
+	if result.Diagnostics.HasErrors() {
+		t.Errorf("unexpected errors: %v", result.Diagnostics)
+	}
+}
+
+func TestBindReduce(t *testing.T) {
+	src := `T | reduce by Message`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	result := Bind(script, nil, p.File())
+	tab, ok := result.ResultType.(*types.Tabular)
+	if !ok {
+		t.Fatalf("expected tabular result, got %T", result.ResultType)
+	}
+
+	// Reduce returns Pattern, Count, Representative
+	if col := tab.Column("Pattern"); col == nil {
+		t.Error("expected Pattern column from reduce")
 	}
 }

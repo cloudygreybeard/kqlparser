@@ -51,6 +51,30 @@ func (p *Parser) parseOperator() ast.Operator {
 		return p.parseSerializeOp(pipePos)
 	case token.INVOKE:
 		return p.parseInvokeOp(pipePos)
+	case token.PROJECTRENAME:
+		return p.parseProjectRenameOp(pipePos)
+	case token.PROJECTREORDER:
+		return p.parseProjectReorderOp(pipePos)
+	case token.SAMPLE:
+		return p.parseSampleOp(pipePos)
+	case token.SAMPLEDISTINCT:
+		return p.parseSampleDistinctOp(pipePos)
+	case token.LOOKUP:
+		return p.parseLookupOp(pipePos)
+	case token.MAKESERIES:
+		return p.parseMakeSeriesOp(pipePos)
+	case token.SCAN:
+		return p.parseScanOp(pipePos)
+	case token.CONSUME:
+		return p.parseConsumeOp(pipePos)
+	case token.EVALUATE:
+		return p.parseEvaluateOp(pipePos)
+	case token.REDUCE:
+		return p.parseReduceOp(pipePos)
+	case token.FORK:
+		return p.parseForkOp(pipePos)
+	case token.FACET:
+		return p.parseFacetOp(pipePos)
 	default:
 		return p.parseGenericOp(pipePos)
 	}
@@ -345,75 +369,373 @@ func (p *Parser) parseSearchOp(pipePos token.Pos) *ast.SearchOp {
 	return &ast.SearchOp{Pipe: pipePos, Search: searchPos, Predicate: predicate}
 }
 
-// parseAsOp parses an as operator (returns as GenericOp for now).
-func (p *Parser) parseAsOp(pipePos token.Pos) *ast.GenericOp {
+// parseAsOp parses an as operator.
+func (p *Parser) parseAsOp(pipePos token.Pos) *ast.AsOp {
 	asPos := p.pos
 	p.next() // consume 'as'
 
-	var content []ast.Expr
-	content = append(content, p.parseIdent())
+	name := p.parseIdent()
 
-	return &ast.GenericOp{
-		Pipe:    pipePos,
-		OpPos:   asPos,
-		OpName:  "as",
-		Content: content,
-		EndPos:  p.pos,
+	return &ast.AsOp{
+		Pipe: pipePos,
+		As:   asPos,
+		Name: name,
 	}
 }
 
 // parseGetSchemaOp parses a getschema operator.
-func (p *Parser) parseGetSchemaOp(pipePos token.Pos) *ast.GenericOp {
+func (p *Parser) parseGetSchemaOp(pipePos token.Pos) *ast.GetSchemaOp {
 	opPos := p.pos
 	p.next() // consume 'getschema'
 
-	return &ast.GenericOp{
-		Pipe:   pipePos,
-		OpPos:  opPos,
-		OpName: "getschema",
-		EndPos: p.pos,
+	return &ast.GetSchemaOp{
+		Pipe:      pipePos,
+		GetSchema: opPos,
 	}
 }
 
 // parseSerializeOp parses a serialize operator.
-func (p *Parser) parseSerializeOp(pipePos token.Pos) *ast.GenericOp {
+func (p *Parser) parseSerializeOp(pipePos token.Pos) *ast.SerializeOp {
 	opPos := p.pos
 	p.next() // consume 'serialize'
 
-	var content []ast.Expr
+	var columns []*ast.NamedExpr
 	for p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
 		expr := p.parseNamedExprSingle()
-		content = append(content, expr)
+		columns = append(columns, expr)
 		if !p.accept(token.COMMA) {
 			break
 		}
 	}
 
-	return &ast.GenericOp{
-		Pipe:    pipePos,
-		OpPos:   opPos,
-		OpName:  "serialize",
-		Content: content,
-		EndPos:  p.pos,
+	return &ast.SerializeOp{
+		Pipe:      pipePos,
+		Serialize: opPos,
+		Columns:   columns,
 	}
 }
 
 // parseInvokeOp parses an invoke operator.
-func (p *Parser) parseInvokeOp(pipePos token.Pos) *ast.GenericOp {
+func (p *Parser) parseInvokeOp(pipePos token.Pos) *ast.InvokeOp {
 	opPos := p.pos
 	p.next() // consume 'invoke'
 
-	var content []ast.Expr
 	// Parse the function call
-	content = append(content, p.parsePostfixExpr())
-
-	return &ast.GenericOp{
-		Pipe:    pipePos,
-		OpPos:   opPos,
-		OpName:  "invoke",
-		Content: content,
-		EndPos:  p.pos,
+	expr := p.parsePostfixExpr()
+	var funcCall *ast.CallExpr
+	if call, ok := expr.(*ast.CallExpr); ok {
+		funcCall = call
+	} else {
+		// Wrap as a call if just an identifier
+		funcCall = &ast.CallExpr{Fun: expr, Lparen: expr.Pos(), Rparen: expr.End()}
 	}
+
+	return &ast.InvokeOp{
+		Pipe:     pipePos,
+		Invoke:   opPos,
+		Function: funcCall,
+	}
+}
+
+// parseProjectRenameOp parses a project-rename operator.
+func (p *Parser) parseProjectRenameOp(pipePos token.Pos) *ast.ProjectRenameOp {
+	opPos := p.pos
+	p.next() // consume 'project-rename'
+
+	var columns []*ast.RenameExpr
+	for p.tok == token.IDENT || p.tok.IsKeyword() {
+		newName := p.parseIdent()
+		assignPos := p.expect(token.ASSIGN)
+		oldName := p.parseIdent()
+		columns = append(columns, &ast.RenameExpr{
+			NewName: newName,
+			Assign:  assignPos,
+			OldName: oldName,
+		})
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	return &ast.ProjectRenameOp{
+		Pipe:          pipePos,
+		ProjectRename: opPos,
+		Columns:       columns,
+	}
+}
+
+// parseProjectReorderOp parses a project-reorder operator.
+func (p *Parser) parseProjectReorderOp(pipePos token.Pos) *ast.ProjectReorderOp {
+	opPos := p.pos
+	p.next() // consume 'project-reorder'
+
+	var columns []*ast.Ident
+	for p.tok == token.IDENT || p.tok.IsKeyword() {
+		columns = append(columns, p.parseIdent())
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	return &ast.ProjectReorderOp{
+		Pipe:           pipePos,
+		ProjectReorder: opPos,
+		Columns:        columns,
+	}
+}
+
+// parseSampleOp parses a sample operator.
+func (p *Parser) parseSampleOp(pipePos token.Pos) *ast.SampleOp {
+	opPos := p.pos
+	p.next() // consume 'sample'
+
+	count := p.parseExprNoPipe()
+
+	return &ast.SampleOp{
+		Pipe:   pipePos,
+		Sample: opPos,
+		Count:  count,
+	}
+}
+
+// parseSampleDistinctOp parses a sample-distinct operator.
+func (p *Parser) parseSampleDistinctOp(pipePos token.Pos) *ast.SampleDistinctOp {
+	opPos := p.pos
+	p.next() // consume 'sample-distinct'
+
+	count := p.parseExprNoPipe()
+	ofPos := p.expect(token.OF)
+	column := p.parseExprNoPipe()
+
+	return &ast.SampleDistinctOp{
+		Pipe:           pipePos,
+		SampleDistinct: opPos,
+		Count:          count,
+		OfPos:          ofPos,
+		Column:         column,
+	}
+}
+
+// parseLookupOp parses a lookup operator.
+func (p *Parser) parseLookupOp(pipePos token.Pos) *ast.LookupOp {
+	opPos := p.pos
+	p.next() // consume 'lookup'
+
+	op := &ast.LookupOp{Pipe: pipePos, Lookup: opPos, Kind: ast.JoinLeftOuter}
+
+	// Check for kind parameter
+	if p.tok == token.KIND {
+		p.next()
+		p.expect(token.ASSIGN)
+		kind := p.parseIdent()
+		op.Kind = parseJoinKind(kind.Name)
+	}
+
+	// Parse table
+	op.Table = p.parseUnaryExpr()
+
+	// Check for 'on' clause
+	if p.tok == token.ON {
+		op.OnPos = p.pos
+		p.next()
+
+		for p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
+			cond := p.parseExprNoPipe()
+			op.OnExpr = append(op.OnExpr, cond)
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+	}
+
+	return op
+}
+
+// parseMakeSeriesOp parses a make-series operator.
+func (p *Parser) parseMakeSeriesOp(pipePos token.Pos) *ast.MakeSeriesOp {
+	opPos := p.pos
+	p.next() // consume 'make-series'
+
+	op := &ast.MakeSeriesOp{Pipe: pipePos, MakeSeries: opPos}
+
+	// Parse aggregates until 'on'
+	for p.tok != token.ON && p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
+		expr := p.parseNamedExprSingle()
+		op.Aggregates = append(op.Aggregates, expr)
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	// Parse 'on' column
+	if p.tok == token.ON {
+		op.OnPos = p.pos
+		p.next()
+		op.OnColumn = p.parseExprNoPipe()
+	}
+
+	// Parse optional 'in range(...)' - simplified parsing
+	if p.tok == token.IN {
+		inPos := p.pos
+		p.next()
+		if p.tok == token.IDENT && p.lit == "range" {
+			rangePos := p.pos
+			p.next()
+			lparen := p.expect(token.LPAREN)
+			start := p.parseExprNoPipe()
+			p.expect(token.COMMA)
+			stop := p.parseExprNoPipe()
+			p.expect(token.COMMA)
+			step := p.parseExprNoPipe()
+			rparen := p.expect(token.RPAREN)
+			op.InRange = &ast.InRangeExpr{
+				InPos:  inPos,
+				Range:  rangePos,
+				Lparen: lparen,
+				Start:  start,
+				Stop:   stop,
+				Step:   step,
+				Rparen: rparen,
+			}
+		}
+	}
+
+	// Parse optional 'by' clause
+	if p.tok == token.BY {
+		op.ByPos = p.pos
+		p.next()
+		op.GroupBy = p.parseNamedExprList()
+	}
+
+	return op
+}
+
+// parseScanOp parses a scan operator.
+func (p *Parser) parseScanOp(pipePos token.Pos) *ast.ScanOp {
+	opPos := p.pos
+	p.next() // consume 'scan'
+
+	op := &ast.ScanOp{Pipe: pipePos, Scan: opPos}
+
+	// Scan has complex syntax with 'with' and steps - simplified for now
+	if p.tok == token.WITH {
+		op.With = p.pos
+		p.next()
+	}
+
+	// Parse content until next pipe
+	for p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
+		expr := p.parseExpr()
+		if expr != nil {
+			op.Steps = append(op.Steps, expr)
+		}
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	op.EndPos = p.pos
+	return op
+}
+
+// parseConsumeOp parses a consume operator.
+func (p *Parser) parseConsumeOp(pipePos token.Pos) *ast.ConsumeOp {
+	opPos := p.pos
+	p.next() // consume 'consume'
+
+	return &ast.ConsumeOp{
+		Pipe:    pipePos,
+		Consume: opPos,
+	}
+}
+
+// parseEvaluateOp parses an evaluate operator.
+func (p *Parser) parseEvaluateOp(pipePos token.Pos) *ast.EvaluateOp {
+	opPos := p.pos
+	p.next() // consume 'evaluate'
+
+	expr := p.parsePostfixExpr()
+	var plugin *ast.CallExpr
+	if call, ok := expr.(*ast.CallExpr); ok {
+		plugin = call
+	} else {
+		plugin = &ast.CallExpr{Fun: expr, Lparen: expr.Pos(), Rparen: expr.End()}
+	}
+
+	return &ast.EvaluateOp{
+		Pipe:     pipePos,
+		Evaluate: opPos,
+		Plugin:   plugin,
+	}
+}
+
+// parseReduceOp parses a reduce operator.
+func (p *Parser) parseReduceOp(pipePos token.Pos) *ast.ReduceOp {
+	opPos := p.pos
+	p.next() // consume 'reduce'
+
+	byPos := p.expect(token.BY)
+	column := p.parseExprNoPipe()
+
+	return &ast.ReduceOp{
+		Pipe:   pipePos,
+		Reduce: opPos,
+		ByPos:  byPos,
+		Column: column,
+	}
+}
+
+// parseForkOp parses a fork operator.
+func (p *Parser) parseForkOp(pipePos token.Pos) *ast.ForkOp {
+	opPos := p.pos
+	p.next() // consume 'fork'
+
+	op := &ast.ForkOp{Pipe: pipePos, Fork: opPos}
+
+	// Parse prongs (simplified - fork has complex syntax)
+	for p.tok == token.LPAREN {
+		prong := &ast.ForkProng{Lparen: p.pos}
+		p.next() // consume '('
+		// Parse inner query as expression (simplified)
+		expr := p.parseExpr()
+		if pipe, ok := expr.(*ast.PipeExpr); ok {
+			prong.Query = pipe
+		}
+		prong.Rparen = p.expect(token.RPAREN)
+		op.Prongs = append(op.Prongs, prong)
+	}
+
+	op.EndPos = p.pos
+	return op
+}
+
+// parseFacetOp parses a facet operator.
+func (p *Parser) parseFacetOp(pipePos token.Pos) *ast.FacetOp {
+	opPos := p.pos
+	p.next() // consume 'facet'
+
+	op := &ast.FacetOp{Pipe: pipePos, Facet: opPos}
+	op.ByPos = p.expect(token.BY)
+
+	// Parse columns
+	for p.tok == token.IDENT || p.tok.IsKeyword() {
+		op.Columns = append(op.Columns, p.parseIdent())
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	// Optional 'with' clause
+	if p.tok == token.WITH {
+		op.With = p.pos
+		p.next()
+		expr := p.parseExpr()
+		if pipe, ok := expr.(*ast.PipeExpr); ok {
+			op.Query = pipe
+		}
+	}
+
+	return op
 }
 
 // parseGenericOp parses an unrecognized operator.

@@ -255,6 +255,258 @@ type SearchOp struct {
 func (x *SearchOp) Pos() token.Pos { return x.Pipe }
 func (x *SearchOp) End() token.Pos { return x.Predicate.End() }
 
+// ProjectRenameOp represents a project-rename operator.
+type ProjectRenameOp struct {
+	Pipe          token.Pos     // Position of "|"
+	ProjectRename token.Pos     // Position of "project-rename"
+	Columns       []*RenameExpr // Column renamings
+}
+
+func (x *ProjectRenameOp) Pos() token.Pos { return x.Pipe }
+
+func (x *ProjectRenameOp) End() token.Pos {
+	if len(x.Columns) > 0 {
+		return x.Columns[len(x.Columns)-1].End()
+	}
+	return x.ProjectRename + 14 // len("project-rename")
+}
+
+// RenameExpr represents a column renaming (NewName = OldName).
+type RenameExpr struct {
+	NewName *Ident    // New column name
+	Assign  token.Pos // Position of "="
+	OldName *Ident    // Old column name
+}
+
+func (x *RenameExpr) Pos() token.Pos { return x.NewName.Pos() }
+func (x *RenameExpr) End() token.Pos { return x.OldName.End() }
+
+// ProjectReorderOp represents a project-reorder operator.
+type ProjectReorderOp struct {
+	Pipe           token.Pos // Position of "|"
+	ProjectReorder token.Pos // Position of "project-reorder"
+	Columns        []*Ident  // Column names in new order
+}
+
+func (x *ProjectReorderOp) Pos() token.Pos { return x.Pipe }
+
+func (x *ProjectReorderOp) End() token.Pos {
+	if len(x.Columns) > 0 {
+		return x.Columns[len(x.Columns)-1].End()
+	}
+	return x.ProjectReorder + 15 // len("project-reorder")
+}
+
+// SampleOp represents a sample operator.
+type SampleOp struct {
+	Pipe   token.Pos // Position of "|"
+	Sample token.Pos // Position of "sample"
+	Count  Expr      // Number of rows to sample
+}
+
+func (x *SampleOp) Pos() token.Pos { return x.Pipe }
+func (x *SampleOp) End() token.Pos { return x.Count.End() }
+
+// SampleDistinctOp represents a sample-distinct operator.
+type SampleDistinctOp struct {
+	Pipe           token.Pos // Position of "|"
+	SampleDistinct token.Pos // Position of "sample-distinct"
+	Count          Expr      // Number of distinct values to sample
+	OfPos          token.Pos // Position of "of"
+	Column         Expr      // Column to sample from
+}
+
+func (x *SampleDistinctOp) Pos() token.Pos { return x.Pipe }
+func (x *SampleDistinctOp) End() token.Pos { return x.Column.End() }
+
+// LookupOp represents a lookup operator.
+type LookupOp struct {
+	Pipe   token.Pos // Position of "|"
+	Lookup token.Pos // Position of "lookup"
+	Kind   JoinKind  // Kind of lookup (inner, leftouter)
+	Table  Expr      // Table to lookup from
+	OnPos  token.Pos // Position of "on"
+	OnExpr []Expr    // Match conditions
+}
+
+func (x *LookupOp) Pos() token.Pos { return x.Pipe }
+
+func (x *LookupOp) End() token.Pos {
+	if len(x.OnExpr) > 0 {
+		return x.OnExpr[len(x.OnExpr)-1].End()
+	}
+	return x.Table.End()
+}
+
+// MakeSeriesOp represents a make-series operator.
+type MakeSeriesOp struct {
+	Pipe       token.Pos    // Position of "|"
+	MakeSeries token.Pos    // Position of "make-series"
+	Aggregates []*NamedExpr // Aggregations (e.g., count())
+	OnPos      token.Pos    // Position of "on"
+	OnColumn   Expr         // Time column
+	InRange    *InRangeExpr // Optional in range(start, stop, step)
+	ByPos      token.Pos    // Position of "by" (NoPos if none)
+	GroupBy    []*NamedExpr // Group by expressions
+}
+
+func (x *MakeSeriesOp) Pos() token.Pos { return x.Pipe }
+
+func (x *MakeSeriesOp) End() token.Pos {
+	if len(x.GroupBy) > 0 {
+		return x.GroupBy[len(x.GroupBy)-1].End()
+	}
+	if x.InRange != nil {
+		return x.InRange.End()
+	}
+	return x.OnColumn.End()
+}
+
+// InRangeExpr represents the "in range(start, stop, step)" clause.
+type InRangeExpr struct {
+	InPos  token.Pos // Position of "in"
+	Range  token.Pos // Position of "range"
+	Lparen token.Pos
+	Start  Expr
+	Stop   Expr
+	Step   Expr
+	Rparen token.Pos
+}
+
+func (x *InRangeExpr) Pos() token.Pos { return x.InPos }
+func (x *InRangeExpr) End() token.Pos { return x.Rparen + 1 }
+
+// AsOp represents an as operator (name a result).
+type AsOp struct {
+	Pipe token.Pos // Position of "|"
+	As   token.Pos // Position of "as"
+	Name *Ident    // Result name
+}
+
+func (x *AsOp) Pos() token.Pos { return x.Pipe }
+func (x *AsOp) End() token.Pos { return x.Name.End() }
+
+// GetSchemaOp represents a getschema operator.
+type GetSchemaOp struct {
+	Pipe      token.Pos // Position of "|"
+	GetSchema token.Pos // Position of "getschema"
+}
+
+func (x *GetSchemaOp) Pos() token.Pos { return x.Pipe }
+func (x *GetSchemaOp) End() token.Pos { return x.GetSchema + 9 } // len("getschema")
+
+// SerializeOp represents a serialize operator.
+type SerializeOp struct {
+	Pipe      token.Pos    // Position of "|"
+	Serialize token.Pos    // Position of "serialize"
+	Columns   []*NamedExpr // Optional column expressions
+}
+
+func (x *SerializeOp) Pos() token.Pos { return x.Pipe }
+
+func (x *SerializeOp) End() token.Pos {
+	if len(x.Columns) > 0 {
+		return x.Columns[len(x.Columns)-1].End()
+	}
+	return x.Serialize + 9 // len("serialize")
+}
+
+// InvokeOp represents an invoke operator (call a stored function).
+type InvokeOp struct {
+	Pipe     token.Pos // Position of "|"
+	Invoke   token.Pos // Position of "invoke"
+	Function *CallExpr // Function to invoke
+}
+
+func (x *InvokeOp) Pos() token.Pos { return x.Pipe }
+func (x *InvokeOp) End() token.Pos { return x.Function.End() }
+
+// ScanOp represents a scan operator.
+type ScanOp struct {
+	Pipe   token.Pos // Position of "|"
+	Scan   token.Pos // Position of "scan"
+	With   token.Pos // Position of "with"
+	Steps  []Expr    // Scan steps
+	EndPos token.Pos
+}
+
+func (x *ScanOp) Pos() token.Pos { return x.Pipe }
+func (x *ScanOp) End() token.Pos { return x.EndPos }
+
+// ConsumeOp represents a consume operator.
+type ConsumeOp struct {
+	Pipe    token.Pos // Position of "|"
+	Consume token.Pos // Position of "consume"
+}
+
+func (x *ConsumeOp) Pos() token.Pos { return x.Pipe }
+func (x *ConsumeOp) End() token.Pos { return x.Consume + 7 } // len("consume")
+
+// EvaluateOp represents an evaluate operator (plugin invocation).
+type EvaluateOp struct {
+	Pipe     token.Pos // Position of "|"
+	Evaluate token.Pos // Position of "evaluate"
+	Plugin   *CallExpr // Plugin call
+}
+
+func (x *EvaluateOp) Pos() token.Pos { return x.Pipe }
+func (x *EvaluateOp) End() token.Pos { return x.Plugin.End() }
+
+// ReduceOp represents a reduce operator.
+type ReduceOp struct {
+	Pipe   token.Pos // Position of "|"
+	Reduce token.Pos // Position of "reduce"
+	ByPos  token.Pos // Position of "by"
+	Column Expr      // Column to reduce
+}
+
+func (x *ReduceOp) Pos() token.Pos { return x.Pipe }
+func (x *ReduceOp) End() token.Pos { return x.Column.End() }
+
+// ForkOp represents a fork operator.
+type ForkOp struct {
+	Pipe   token.Pos    // Position of "|"
+	Fork   token.Pos    // Position of "fork"
+	Prongs []*ForkProng // Fork branches
+	EndPos token.Pos
+}
+
+func (x *ForkOp) Pos() token.Pos { return x.Pipe }
+func (x *ForkOp) End() token.Pos { return x.EndPos }
+
+// ForkProng represents one branch of a fork.
+type ForkProng struct {
+	Name   *Ident // Optional name
+	Lparen token.Pos
+	Query  *PipeExpr // Query for this branch
+	Rparen token.Pos
+}
+
+func (x *ForkProng) Pos() token.Pos { return x.Lparen }
+func (x *ForkProng) End() token.Pos { return x.Rparen + 1 }
+
+// FacetOp represents a facet operator.
+type FacetOp struct {
+	Pipe    token.Pos // Position of "|"
+	Facet   token.Pos // Position of "facet"
+	ByPos   token.Pos // Position of "by"
+	Columns []*Ident  // Columns to facet by
+	With    token.Pos // Position of "with" (NoPos if none)
+	Query   *PipeExpr // Optional with query
+}
+
+func (x *FacetOp) Pos() token.Pos { return x.Pipe }
+
+func (x *FacetOp) End() token.Pos {
+	if x.Query != nil {
+		return x.Query.End()
+	}
+	if len(x.Columns) > 0 {
+		return x.Columns[len(x.Columns)-1].End()
+	}
+	return x.ByPos + 2
+}
+
 // GenericOp represents an unrecognized or less common operator.
 // This allows parsing to continue even with operators we don't fully support.
 type GenericOp struct {
