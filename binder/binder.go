@@ -35,6 +35,13 @@ type GlobalState struct {
 	Aggregates map[string]*symbol.AggregateSymbol
 }
 
+// Options controls binder behavior.
+type Options struct {
+	// StrictMode reports errors for unresolved names.
+	// When false (permissive), unknown names are allowed (useful with incomplete schema).
+	StrictMode bool
+}
+
 // DefaultGlobals returns a GlobalState with built-in functions.
 func DefaultGlobals() *GlobalState {
 	g := &GlobalState{
@@ -53,6 +60,7 @@ func DefaultGlobals() *GlobalState {
 // Binder performs semantic analysis on an AST.
 type Binder struct {
 	globals *GlobalState
+	opts    *Options
 	file    *token.File
 
 	// Results
@@ -67,12 +75,21 @@ type Binder struct {
 
 // Bind performs semantic analysis on a script.
 func Bind(script *ast.Script, globals *GlobalState, file *token.File) *Result {
+	return BindWithOptions(script, globals, file, nil)
+}
+
+// BindWithOptions performs semantic analysis with custom options.
+func BindWithOptions(script *ast.Script, globals *GlobalState, file *token.File, opts *Options) *Result {
 	if globals == nil {
 		globals = DefaultGlobals()
+	}
+	if opts == nil {
+		opts = &Options{StrictMode: false}
 	}
 
 	b := &Binder{
 		globals: globals,
+		opts:    opts,
 		file:    file,
 		types:   make(map[ast.Expr]types.Type),
 		symbols: make(map[*ast.Ident]symbol.Symbol),
@@ -109,6 +126,25 @@ func (b *Binder) error(pos token.Pos, code diagnostic.Code, msg string) {
 // errorf adds a formatted error diagnostic.
 func (b *Binder) errorf(pos token.Pos, code diagnostic.Code, format string, args ...any) {
 	b.error(pos, code, fmt.Sprintf(format, args...))
+}
+
+// warning adds a warning diagnostic.
+func (b *Binder) warning(pos token.Pos, code diagnostic.Code, msg string) {
+	var position token.Position
+	if b.file != nil {
+		position = b.file.Position(pos)
+	}
+	b.diags = append(b.diags, diagnostic.Diagnostic{
+		Pos:      position,
+		Severity: diagnostic.SeverityWarning,
+		Code:     code,
+		Message:  msg,
+	})
+}
+
+// warningf adds a formatted warning diagnostic.
+func (b *Binder) warningf(pos token.Pos, code diagnostic.Code, format string, args ...any) {
+	b.warning(pos, code, fmt.Sprintf(format, args...))
 }
 
 // recordType records the type of an expression.
@@ -225,8 +261,23 @@ func (b *Binder) bindIdent(ident *ast.Ident) types.Type {
 		}
 	}
 
-	// Unresolved - could be a column we don't know about
-	// In permissive mode, we'd return Unknown; in strict mode, error
+	// Unresolved identifier
+	if b.opts.StrictMode {
+		// Determine the most helpful error message
+		if b.rowScope != nil {
+			// We're in a row context, so this is likely a column reference
+			b.errorf(ident.Pos(), diagnostic.CodeUnresolvedColumn,
+				"column '%s' not found in current scope", name)
+		} else if b.globals.Database != nil {
+			// We have a database, so this might be a table reference
+			b.errorf(ident.Pos(), diagnostic.CodeUnresolvedTable,
+				"table '%s' not found in database '%s'", name, b.globals.Database.Name())
+		} else {
+			b.errorf(ident.Pos(), diagnostic.CodeUnresolvedName,
+				"name '%s' not found", name)
+		}
+	}
+
 	return b.recordType(ident, types.Typ_Unknown)
 }
 
@@ -265,19 +316,30 @@ func (b *Binder) bindBinaryExpr(expr *ast.BinaryExpr) types.Type {
 
 	switch expr.Op {
 	// Comparison operators -> bool
-	case token.EQL, token.NEQ, token.LSS, token.GTR, token.LEQ, token.GEQ,
-		token.CONTAINS, token.CONTAINSCS, token.STARTSWITH, token.STARTSWITHCS,
+	case token.EQL, token.NEQ, token.LSS, token.GTR, token.LEQ, token.GEQ:
+		b.checkComparableTypes(expr, leftType, rightType)
+		resultType = types.Typ_Bool
+
+	// String operators -> bool
+	case token.CONTAINS, token.CONTAINSCS, token.STARTSWITH, token.STARTSWITHCS,
 		token.ENDSWITH, token.ENDSWITHCS, token.HAS, token.HASCS,
 		token.HASALL, token.HASANY, token.LIKE, token.MATCHESREGEX:
+		b.checkStringOperands(expr, leftType, rightType)
 		resultType = types.Typ_Bool
 
 	// Logical operators -> bool
 	case token.AND, token.OR:
+		b.checkBoolOperands(expr, leftType, rightType)
 		resultType = types.Typ_Bool
 
 	// Arithmetic operators
 	case token.ADD, token.SUB, token.MUL, token.QUO, token.REM:
 		resultType = b.resolveArithmeticType(leftType, rightType)
+		if resultType == types.Typ_Unknown && b.opts.StrictMode {
+			b.errorf(expr.OpPos, diagnostic.CodeInvalidOperand,
+				"operator '%s' cannot be applied to %s and %s",
+				expr.Op, leftType, rightType)
+		}
 
 	// In operator -> bool
 	case token.IN:
@@ -288,6 +350,61 @@ func (b *Binder) bindBinaryExpr(expr *ast.BinaryExpr) types.Type {
 	}
 
 	return b.recordType(expr, resultType)
+}
+
+// checkComparableTypes checks that two types can be compared.
+func (b *Binder) checkComparableTypes(expr *ast.BinaryExpr, left, right types.Type) {
+	if !b.opts.StrictMode {
+		return
+	}
+	// Skip check if either side is unknown or dynamic
+	if _, ok := left.(*types.Unknown); ok {
+		return
+	}
+	if _, ok := right.(*types.Unknown); ok {
+		return
+	}
+	if types.IsDynamic(left) || types.IsDynamic(right) {
+		return
+	}
+
+	if !types.Compatible(left, right) {
+		b.errorf(expr.OpPos, diagnostic.CodeTypeMismatch,
+			"cannot compare %s with %s", left, right)
+	}
+}
+
+// checkStringOperands checks that string operators have appropriate operands.
+func (b *Binder) checkStringOperands(expr *ast.BinaryExpr, left, right types.Type) {
+	if !b.opts.StrictMode {
+		return
+	}
+	// Left side should typically be string or dynamic
+	if !types.IsString(left) && !types.IsDynamic(left) {
+		if _, ok := left.(*types.Unknown); !ok {
+			b.errorf(expr.X.Pos(), diagnostic.CodeInvalidOperand,
+				"operator '%s' requires string operand, got %s", expr.Op, left)
+		}
+	}
+}
+
+// checkBoolOperands checks that logical operators have bool operands.
+func (b *Binder) checkBoolOperands(expr *ast.BinaryExpr, left, right types.Type) {
+	if !b.opts.StrictMode {
+		return
+	}
+	if !types.IsBool(left) && !types.IsDynamic(left) {
+		if _, ok := left.(*types.Unknown); !ok {
+			b.errorf(expr.X.Pos(), diagnostic.CodeInvalidOperand,
+				"operator '%s' requires bool operand, got %s", expr.Op, left)
+		}
+	}
+	if !types.IsBool(right) && !types.IsDynamic(right) {
+		if _, ok := right.(*types.Unknown); !ok {
+			b.errorf(expr.Y.Pos(), diagnostic.CodeInvalidOperand,
+				"operator '%s' requires bool operand, got %s", expr.Op, right)
+		}
+	}
 }
 
 // resolveArithmeticType determines the result type of an arithmetic operation.
@@ -341,15 +458,18 @@ func (b *Binder) bindUnaryExpr(expr *ast.UnaryExpr) types.Type {
 // bindCallExpr binds a function call.
 func (b *Binder) bindCallExpr(expr *ast.CallExpr) types.Type {
 	// Bind arguments first
+	var argTypes []types.Type
 	for _, arg := range expr.Args {
-		b.bindExpr(arg)
+		argTypes = append(argTypes, b.bindExpr(arg))
 	}
 
 	// Get function name
 	var funcName string
+	var funcIdent *ast.Ident
 	switch fn := expr.Fun.(type) {
 	case *ast.Ident:
 		funcName = fn.Name
+		funcIdent = fn
 	default:
 		// Could be a method call or other expression
 		b.bindExpr(expr.Fun)
@@ -358,18 +478,90 @@ func (b *Binder) bindCallExpr(expr *ast.CallExpr) types.Type {
 
 	// Look up function
 	if fn := b.globals.Functions[funcName]; fn != nil {
-		b.recordSymbol(expr.Fun.(*ast.Ident), fn)
+		b.recordSymbol(funcIdent, fn)
+		b.checkFunctionArgs(expr, fn, argTypes)
 		return b.recordType(expr, fn.Type())
 	}
 
 	// Look up aggregate
 	if agg := b.globals.Aggregates[funcName]; agg != nil {
-		b.recordSymbol(expr.Fun.(*ast.Ident), agg)
+		b.recordSymbol(funcIdent, agg)
+		b.checkFunctionArgs(expr, &agg.FunctionSymbol, argTypes)
 		return b.recordType(expr, agg.Type())
 	}
 
-	// Unknown function - don't error, might be user-defined
+	// Check if it's a user-defined function in the database
+	if b.globals.Database != nil {
+		if fn := b.globals.Database.Function(funcName); fn != nil {
+			b.recordSymbol(funcIdent, fn)
+			return b.recordType(expr, fn.Type())
+		}
+	}
+
+	// Unknown function
+	if b.opts.StrictMode {
+		b.errorf(funcIdent.Pos(), diagnostic.CodeUnresolvedFunction,
+			"function '%s' not found", funcName)
+	}
 	return b.recordType(expr, types.Typ_Unknown)
+}
+
+// checkFunctionArgs validates function arguments.
+func (b *Binder) checkFunctionArgs(expr *ast.CallExpr, fn *symbol.FunctionSymbol, argTypes []types.Type) {
+	if len(fn.Signatures) == 0 {
+		return
+	}
+
+	// Check first signature (simplified - full impl would check all overloads)
+	sig := fn.Signatures[0]
+	argCount := len(argTypes)
+
+	// Check argument count
+	if argCount < sig.MinArgs {
+		b.errorf(expr.Lparen, diagnostic.CodeWrongArgCount,
+			"function '%s' requires at least %d argument(s), got %d",
+			fn.Name(), sig.MinArgs, argCount)
+		return
+	}
+
+	if sig.MaxArgs >= 0 && argCount > sig.MaxArgs {
+		b.errorf(expr.Lparen, diagnostic.CodeWrongArgCount,
+			"function '%s' accepts at most %d argument(s), got %d",
+			fn.Name(), sig.MaxArgs, argCount)
+		return
+	}
+
+	// Check argument types
+	for i, argType := range argTypes {
+		if i >= len(sig.Parameters) {
+			break // Variadic or extra args
+		}
+		param := sig.Parameters[i]
+		if !b.isTypeCompatible(argType, param.Type) {
+			b.errorf(expr.Args[i].Pos(), diagnostic.CodeInvalidArgument,
+				"argument %d of '%s': expected %s, got %s",
+				i+1, fn.Name(), param.Type.String(), argType.String())
+		}
+	}
+}
+
+// isTypeCompatible checks if a value type can be used where an expected type is required.
+func (b *Binder) isTypeCompatible(value, expected types.Type) bool {
+	// Unknown is compatible with everything (permissive)
+	if _, ok := value.(*types.Unknown); ok {
+		return true
+	}
+	if _, ok := expected.(*types.Unknown); ok {
+		return true
+	}
+
+	// Dynamic accepts anything
+	if types.IsDynamic(expected) || types.IsDynamic(value) {
+		return true
+	}
+
+	// Use the types package compatibility check
+	return types.Compatible(value, expected)
 }
 
 // bindSelectorExpr binds a selector expression (e.g., table.column).
@@ -381,11 +573,25 @@ func (b *Binder) bindSelectorExpr(expr *ast.SelectorExpr) types.Type {
 		if col := tab.Column(expr.Sel.Name); col != nil {
 			return b.recordType(expr, col.Type)
 		}
+		// Column not found in table
+		if b.opts.StrictMode {
+			b.errorf(expr.Sel.Pos(), diagnostic.CodeUnresolvedColumn,
+				"column '%s' not found in table", expr.Sel.Name)
+		}
+		return b.recordType(expr, types.Typ_Unknown)
 	}
 
 	// Dynamic access always returns dynamic
-	if baseType == types.Typ_Dynamic {
+	if types.IsDynamic(baseType) {
 		return b.recordType(expr, types.Typ_Dynamic)
+	}
+
+	// Accessing property on non-tabular, non-dynamic type
+	if b.opts.StrictMode {
+		if _, ok := baseType.(*types.Unknown); !ok {
+			b.errorf(expr.Dot, diagnostic.CodeInvalidOperator,
+				"cannot access property '%s' on %s", expr.Sel.Name, baseType)
+		}
 	}
 
 	return b.recordType(expr, types.Typ_Unknown)

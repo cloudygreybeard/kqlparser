@@ -3,6 +3,7 @@ package binder
 import (
 	"testing"
 
+	"github.com/cloudygreybeard/kqlparser/diagnostic"
 	"github.com/cloudygreybeard/kqlparser/parser"
 	"github.com/cloudygreybeard/kqlparser/symbol"
 	"github.com/cloudygreybeard/kqlparser/types"
@@ -245,9 +246,192 @@ func TestSymbolResolution(t *testing.T) {
 	}
 
 	result := Bind(script, globals, p.File())
-
+	
 	// Check that symbols were resolved
 	if len(result.Symbols) == 0 {
 		t.Error("expected symbols to be resolved")
+	}
+}
+
+// Diagnostic tests
+
+func TestDiagnosticUnresolvedColumn(t *testing.T) {
+	globals := DefaultGlobals()
+	globals.Database = symbol.NewDatabase("TestDB")
+	globals.Database.AddTable(symbol.NewTable("Events",
+		types.NewColumn("Value", types.Typ_Long),
+	))
+
+	src := `Events | where UnknownColumn > 10`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	opts := &Options{StrictMode: true}
+	result := BindWithOptions(script, globals, p.File(), opts)
+	
+	if !result.Diagnostics.HasErrors() {
+		t.Error("expected error for unresolved column")
+	}
+
+	// Check the error message
+	found := false
+	for _, d := range result.Diagnostics {
+		if d.Code == diagnostic.CodeUnresolvedColumn {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected CodeUnresolvedColumn diagnostic")
+	}
+}
+
+func TestDiagnosticUnresolvedTable(t *testing.T) {
+	globals := DefaultGlobals()
+	globals.Database = symbol.NewDatabase("TestDB")
+
+	src := `UnknownTable | take 10`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	opts := &Options{StrictMode: true}
+	result := BindWithOptions(script, globals, p.File(), opts)
+	
+	if !result.Diagnostics.HasErrors() {
+		t.Error("expected error for unresolved table")
+	}
+}
+
+func TestDiagnosticUnresolvedFunction(t *testing.T) {
+	src := `unknownFunc(123)`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	opts := &Options{StrictMode: true}
+	result := BindWithOptions(script, nil, p.File(), opts)
+	
+	if !result.Diagnostics.HasErrors() {
+		t.Error("expected error for unresolved function")
+	}
+
+	found := false
+	for _, d := range result.Diagnostics {
+		if d.Code == diagnostic.CodeUnresolvedFunction {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected CodeUnresolvedFunction diagnostic")
+	}
+}
+
+func TestDiagnosticWrongArgCount(t *testing.T) {
+	// strlen requires 1 argument
+	src := `strlen()`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	opts := &Options{StrictMode: true}
+	result := BindWithOptions(script, nil, p.File(), opts)
+	
+	if !result.Diagnostics.HasErrors() {
+		t.Error("expected error for wrong argument count")
+	}
+
+	found := false
+	for _, d := range result.Diagnostics {
+		if d.Code == diagnostic.CodeWrongArgCount {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected CodeWrongArgCount diagnostic, got: %v", result.Diagnostics)
+	}
+}
+
+func TestDiagnosticTypeMismatch(t *testing.T) {
+	// Comparing string with number
+	src := `"hello" == 123`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	opts := &Options{StrictMode: true}
+	result := BindWithOptions(script, nil, p.File(), opts)
+	
+	if !result.Diagnostics.HasErrors() {
+		t.Error("expected error for type mismatch")
+	}
+
+	found := false
+	for _, d := range result.Diagnostics {
+		if d.Code == diagnostic.CodeTypeMismatch {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected CodeTypeMismatch diagnostic, got: %v", result.Diagnostics)
+	}
+}
+
+func TestDiagnosticInvalidOperand(t *testing.T) {
+	// Using 'and' with non-boolean operand
+	src := `123 and 456`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	opts := &Options{StrictMode: true}
+	result := BindWithOptions(script, nil, p.File(), opts)
+	
+	if !result.Diagnostics.HasErrors() {
+		t.Error("expected error for invalid operand")
+	}
+
+	found := false
+	for _, d := range result.Diagnostics {
+		if d.Code == diagnostic.CodeInvalidOperand {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected CodeInvalidOperand diagnostic, got: %v", result.Diagnostics)
+	}
+}
+
+func TestPermissiveModeNoDiagnostics(t *testing.T) {
+	// In permissive mode (default), unknown names don't produce errors
+	src := `UnknownTable | where UnknownColumn > 10`
+	p := parser.New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+
+	// Permissive mode (default)
+	result := Bind(script, nil, p.File())
+	
+	if result.Diagnostics.HasErrors() {
+		t.Errorf("expected no errors in permissive mode, got: %v", result.Diagnostics)
 	}
 }
