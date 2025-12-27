@@ -56,6 +56,9 @@ type Code string
 
 // Diagnostic codes
 const (
+	// Syntax errors
+	CodeSyntaxError Code = "KQL000"
+
 	// Name resolution errors
 	CodeUnresolvedName     Code = "KQL001"
 	CodeUnresolvedColumn   Code = "KQL002"
