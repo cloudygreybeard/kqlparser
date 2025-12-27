@@ -31,24 +31,24 @@ type Operator interface {
 }
 
 // All node types implement Node
-func (*Ident) node()         {}
-func (*BadExpr) node()       {}
-func (*BasicLit) node()      {}
-func (*ParenExpr) node()     {}
-func (*UnaryExpr) node()     {}
-func (*BinaryExpr) node()    {}
-func (*CallExpr) node()      {}
-func (*IndexExpr) node()     {}
-func (*SelectorExpr) node()  {}
-func (*ListExpr) node()      {}
-func (*BetweenExpr) node()   {}
-func (*DynamicLit) node()    {}
-func (*StarExpr) node()      {}
-func (*NamedExpr) node()     {}
-func (*PipeExpr) node()      {}
-func (*LetStmt) node()       {}
-func (*ExprStmt) node()      {}
-func (*QueryStmt) node()     {}
+func (*Ident) node()            {}
+func (*BadExpr) node()          {}
+func (*BasicLit) node()         {}
+func (*ParenExpr) node()        {}
+func (*UnaryExpr) node()        {}
+func (*BinaryExpr) node()       {}
+func (*CallExpr) node()         {}
+func (*IndexExpr) node()        {}
+func (*SelectorExpr) node()     {}
+func (*ListExpr) node()         {}
+func (*BetweenExpr) node()      {}
+func (*DynamicLit) node()       {}
+func (*StarExpr) node()         {}
+func (*NamedExpr) node()        {}
+func (*PipeExpr) node()         {}
+func (*LetStmt) node()          {}
+func (*ExprStmt) node()         {}
+func (*QueryStmt) node()        {}
 func (*WhereOp) node()          {}
 func (*ProjectOp) node()        {}
 func (*ProjectAwayOp) node()    {}
