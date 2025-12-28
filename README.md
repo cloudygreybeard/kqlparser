@@ -12,7 +12,7 @@ A pure Go parser and semantic analyzer for [Kusto Query Language (KQL)](https://
 - **Rich Diagnostics** — Actionable error messages with position information
 - **80+ Built-in Functions** — `strlen`, `ago`, `datetime`, `tolower`, and more
 - **30+ Aggregates** — `count`, `sum`, `avg`, `percentile`, `make_list`, etc.
-- **33 Operators** — `where`, `project`, `summarize`, `join`, `union`, and more
+- **44 Operators** — `where`, `project`, `summarize`, `join`, `union`, and more
 - **No Dependencies** — Pure Go, no CGO, no external libraries
 - **No Network Required** — Parse and analyze KQL completely offline
 
@@ -160,14 +160,15 @@ result := kqlparser.ParseAndAnalyzeWithOptions("query.kql", src, globals, opts)
 
 | Category | Operators |
 |----------|-----------|
-| **Filter** | `where`, `search` |
-| **Project** | `project`, `project-away`, `project-rename`, `project-reorder`, `extend` |
-| **Aggregate** | `summarize`, `count`, `distinct` |
+| **Filter** | `where`, `search`, `find` |
+| **Project** | `project`, `project-away`, `project-rename`, `project-reorder`, `project-keep`, `extend` |
+| **Aggregate** | `summarize`, `count`, `distinct`, `top-nested`, `top-hitters` |
 | **Sort/Limit** | `sort`, `order`, `top`, `take`, `limit` |
-| **Join** | `join` (inner, leftouter, rightouter, fullouter, leftsemi, rightsemi, leftanti, rightanti), `lookup`, `union` |
-| **Transform** | `mv-expand`, `parse`, `serialize`, `scan` |
+| **Join** | `join` (8 kinds), `lookup`, `union` |
+| **Transform** | `mv-expand`, `mv-apply`, `parse`, `parse-where`, `parse-kv`, `serialize`, `scan` |
 | **Time Series** | `make-series` |
 | **Sampling** | `sample`, `sample-distinct` |
+| **Data Sources** | `datatable`, `externaldata`, `print`, `range` |
 | **Other** | `as`, `getschema`, `invoke`, `evaluate`, `reduce`, `fork`, `facet`, `render`, `consume` |
 
 ## Diagnostic Codes
