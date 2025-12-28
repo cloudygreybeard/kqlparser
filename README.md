@@ -10,8 +10,8 @@ A pure Go parser and semantic analyzer for [Kusto Query Language (KQL)](https://
 - **Full KQL Parser** — Lexer, parser, and AST for the complete KQL syntax
 - **Semantic Analysis** — Name resolution, type inference, and schema flow tracking
 - **Rich Diagnostics** — Actionable error messages with position information
-- **80+ Built-in Functions** — `strlen`, `ago`, `datetime`, `tolower`, and more
-- **30+ Aggregates** — `count`, `sum`, `avg`, `percentile`, `make_list`, etc.
+- **380+ Built-in Functions** — `strlen`, `ago`, `datetime`, `tolower`, geo/series/IP functions, and more
+- **40+ Aggregates** — `count`, `sum`, `avg`, `percentile`, `make_list`, etc.
 - **44 Operators** — `where`, `project`, `summarize`, `join`, `union`, and more
 - **No Dependencies** — Pure Go, no CGO, no external libraries
 - **No Network Required** — Parse and analyze KQL completely offline
