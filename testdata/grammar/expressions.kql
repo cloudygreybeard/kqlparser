@@ -1,0 +1,179 @@
+// Logical Expressions
+print true or false
+
+print true and false
+
+print true or false and true
+
+print (true or false) and true
+
+print not true
+
+print not (a > b)
+
+// Equality - Standard
+print 1 == 1
+
+print 1 != 2
+
+print 1 <> 2
+
+// Equality - List (in)
+T | where State in ("CA", "WA", "OR")
+
+// Equality - Between
+T | where Value between (10 .. 20)
+
+T | where Time between (datetime(2023-01-01) .. datetime(2023-12-31))
+
+// Relational
+print 1 < 2
+
+print 2 > 1
+
+print 1 <= 1
+
+print 2 >= 2
+
+// Arithmetic
+print 1 + 2
+
+print 5 - 3
+
+print 2 * 3
+
+print 10 / 2
+
+print 10 % 3
+
+print 1 + 2 * 3
+
+print (1 + 2) * 3
+
+print -5
+
+print +5
+
+// String Operators - Case insensitive equality
+T | where Name =~ "test"
+
+// String Operators - has
+T | where Text has "word"
+
+// String Operators - hasprefix
+T | where Text hasprefix "pre"
+
+// String Operators - hassuffix
+T | where Text hassuffix "suf"
+
+// String Operators - contains
+T | where Text contains "sub"
+
+T | where Text contains_cs "Sub"
+
+// String Operators - startswith
+T | where Text startswith "begin"
+
+T | where Text startswith_cs "Begin"
+
+// String Operators - endswith
+T | where Text endswith "end"
+
+T | where Text endswith_cs "End"
+
+// String Operators - matches regex
+T | where Text matches regex "^[a-z]+$"
+
+// Function Call Expressions
+print strlen("hello")
+
+print now()
+
+print ago(1h)
+
+print strcat("a", "b", "c")
+
+// count() special form
+print count()
+
+T | summarize count()
+
+// Dot-composite functions
+print "text".toupper()
+
+T | extend result = Col.split(",").count()
+
+// Path Expressions - Property access
+print obj.property
+
+print obj.nested.deep
+
+// Path Expressions - Element access
+print arr[0]
+
+print dict["key"]
+
+// Path Expressions - Mixed access
+print obj.arr[0].prop
+
+print data["key"].nested[1]
+
+// Entity Expressions
+StormEvents
+
+cluster("help").database("Samples").StormEvents
+
+database("Samples").StormEvents
+
+// datatable Expression
+datatable(Name: string, Value: int) ["Alice", 1, "Bob", 2]
+
+datatable(A: long, B: string) [1, "x", 2, "y"]
+
+// externaldata Expression
+externaldata(Col1: string, Col2: int) ["https://example.com/data.csv"]
+
+// range Expression
+range x from 1 to 10 step 1
+
+range dt from datetime(2023-01-01) to datetime(2023-01-31) step 1d
+
+// Named Expressions
+T | extend NewCol = Value * 2
+
+// Parenthesized Expressions
+print (1 + 2) * 3
+
+print ((a or b) and c)
+
+T | where (State == "CA" or State == "WA") and Value > 10
+
+// Dynamic Expressions
+print dynamic([1, 2, 3])
+
+print dynamic({"key": "value"})
+
+print dynamic({"arr": [1, 2], "obj": {"nested": true}})
+
+T | extend d = pack("a", 1, "b", 2)
+
+T | extend d = bag_pack("x", Value)
+
+// Type Coercion
+print tostring(123)
+
+print toint("456")
+
+print tolong(1.5)
+
+print todouble("3.14")
+
+print todatetime("2023-01-01")
+
+print totimespan("1:30:00")
+
+print tobool("true")
+
+print toguid("12345678-1234-1234-1234-123456789abc")
+
+print todynamic('{"a":1}')

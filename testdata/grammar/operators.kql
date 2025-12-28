@@ -1,0 +1,163 @@
+// as operator
+StormEvents | as T
+
+// consume
+T | consume
+
+// count
+T | count
+
+// distinct
+T | distinct *
+
+T | distinct State
+
+T | distinct State, EventType
+
+// evaluate
+T | evaluate bag_unpack(Properties)
+
+T | evaluate autocluster()
+
+// extend
+T | extend NewCol = Col1 + Col2
+
+T | extend A = 1, B = 2, C = A + B
+
+// facet
+T | facet by State
+
+T | facet by State, EventType
+
+// find (basic)
+find "error"
+
+// getschema
+T | getschema
+
+// invoke
+T | invoke myFunction()
+
+T | invoke filterFunc(10, "test")
+
+// join
+T1 | join T2 on Key
+
+T1 | join kind=inner T2 on Key
+
+// lookup
+T1 | lookup T2 on Key
+
+// make-series
+T | make-series count() on TimeGenerated step 1h
+
+T | make-series avg(V) on T from datetime(2023-01-01) to datetime(2023-02-01) step 1h
+
+// mv-expand
+T | mv-expand Col
+
+T | mv-expand Col1, Col2
+
+// parse
+T | parse Text with * "key=" Key
+
+T | parse Text with "start" Middle "end"
+
+// parse-kv
+T | parse-kv Text as (Key1, Key2)
+
+// parse-where
+T | parse-where Text with * "value=" Value *
+
+// project
+T | project Col1, Col2
+
+T | project NewName = OldName
+
+T | project A, B = C + D, E
+
+// project-away
+T | project-away TempCol
+
+// project-keep
+T | project-keep Name, Value
+
+// project-rename
+T | project-rename NewName = OldName
+
+T | project-rename A = X, B = Y
+
+// project-reorder
+T | project-reorder Name, Value, *
+
+T | project-reorder * asc
+
+// reduce
+T | reduce by Text
+
+// render
+T | render table
+
+T | render barchart
+
+// sample
+T | sample 100
+
+// sample-distinct
+T | sample-distinct 10 of State
+
+// search
+search "error"
+
+search in (Table1, Table2) "pattern"
+
+// serialize
+T | serialize
+
+T | serialize RowNum = row_number()
+
+// sort/order
+T | sort by Value
+
+T | sort by Value desc
+
+T | sort by Value asc nulls first
+
+T | order by A, B desc, C
+
+// summarize
+T | summarize count()
+
+T | summarize count() by State
+
+T | summarize sum(Value), avg(Value) by bin(Time, 1h)
+
+T | summarize Count=count(), Total=sum(V) by Category
+
+// take/limit
+T | take 10
+
+T | limit 100
+
+// top
+T | top 10 by Value
+
+T | top 10 by Value desc
+
+// top-hitters
+T | top-hitters 10 of State
+
+T | top-hitters 10 of State by sum(Value)
+
+// top-nested
+T | top-nested 5 of State by count(), top-nested 3 of City by count()
+
+// union (basic form)
+union (Table1)
+
+// where/filter
+T | where Value > 10
+
+T | where State == "California" and EventType contains "Storm"
+
+T | filter isnotnull(Value)

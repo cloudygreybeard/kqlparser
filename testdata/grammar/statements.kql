@@ -1,0 +1,23 @@
+// Let Statements - Variable declaration
+let x = 5
+
+let name = "test"
+
+let dt = datetime(2023-01-01)
+
+// Set Statement
+set notruncation
+
+set querytrace
+
+// Query Statement - Simple
+StormEvents
+
+// Query Statement - With operators
+StormEvents | take 10
+
+// Multiple statements
+let x = 5; print x
+
+// Statement with trailing semicolon
+StormEvents | count;

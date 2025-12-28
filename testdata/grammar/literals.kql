@@ -1,0 +1,119 @@
+// String Literals - Double quoted
+print "hello world"
+print "with\nescape\tsequences"
+print "with unicode \u0041"
+
+// String Literals - Single quoted
+print 'single quotes'
+print 'with\nescape'
+
+// String Literals - Verbatim (@ prefix)
+print @"verbatim string with \n literal backslash"
+print @'verbatim single quoted'
+
+// String Literals - Multi-line (TODO: not yet supported)
+// print ```multi line string```
+// print ~~~alternate multiline~~~
+
+// String Literals - Hash-prefixed (obfuscated)
+print h"obfuscated"
+print H'obfuscated single'
+print h@"verbatim obfuscated"
+
+// Integer Literals
+print 0
+print 1
+print 123
+print 9999999999
+print 0x1A2B3C4D
+print 0X1a2b3c4d
+print long(42)
+print int64(100)
+print int(42)
+print int32(100)
+
+// Real Literals
+print 1.5
+print 3.14159
+print 1e10
+print 1E-5
+print 2.5e+3
+print real(1.5)
+print double(2.5)
+print decimal(123.456)
+
+// Boolean Literals
+print true
+print false
+print TRUE
+print FALSE
+print True
+print False
+print bool(true)
+
+// DateTime Literals
+print datetime(2023-01-15)
+print datetime(null)
+
+// Timespan Literals - Minutes
+print 5m
+print 5min
+print 5minute
+print 5minutes
+
+// Timespan Literals - Seconds
+print 30s
+print 30sec
+print 30second
+print 30seconds
+
+// Timespan Literals - Days
+print 1d
+print 1day
+print 7days
+
+// Timespan Literals - Hours
+print 2h
+print 2hour
+print 24hours
+print 2hr
+print 2hrs
+
+// Timespan Literals - Milliseconds
+print 100ms
+
+// Timespan Literals - Other units (TODO: verify support)
+// print 100milli
+// print 100milliseconds
+// print 100micro
+// print 100microseconds
+// print 100nano
+// print 100nanoseconds
+// print 1000tick
+// print 1000ticks
+
+// Typed Timespan (TODO: not yet supported)
+// print time(1:30:00)
+// print timespan(0.01:30:00)
+
+// GUID Literals (TODO: not yet supported)
+// print guid(12345678-1234-1234-1234-123456789abc)
+// print uuid(12345678-1234-1234-1234-123456789abc)
+// print uniqueid(12345678-1234-1234-1234-123456789abc)
+// print guid(null)
+
+// Type Literals (TODO: not yet supported)
+// print typeof(long)
+// print typeof(string)
+// print typeof(datetime)
+// print typeof(dynamic)
+
+// Null Literal
+print null
+
+// Dynamic Literals
+print dynamic(null)
+print dynamic([1, 2, 3])
+print dynamic({"a": 1, "b": 2})
+print dynamic([{"x": 1}, {"x": 2}])
+print dynamic({"nested": {"deep": "value"}})
