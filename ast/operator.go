@@ -229,6 +229,40 @@ type ParseOp struct {
 func (x *ParseOp) Pos() token.Pos { return x.Pipe }
 func (x *ParseOp) End() token.Pos { return x.Pattern.End() }
 
+// ParseWhereOp represents a parse-where operator.
+type ParseWhereOp struct {
+	Pipe       token.Pos // Position of "|"
+	ParseWhere token.Pos // Position of "parse-where"
+	Source     Expr      // Source expression to parse
+	Pattern    Expr      // Parse pattern
+}
+
+func (x *ParseWhereOp) Pos() token.Pos { return x.Pipe }
+func (x *ParseWhereOp) End() token.Pos { return x.Pattern.End() }
+
+// ParseKvOp represents a parse-kv operator.
+type ParseKvOp struct {
+	Pipe    token.Pos // Position of "|"
+	ParseKv token.Pos // Position of "parse-kv"
+	Source  Expr      // Source column
+	AsPos   token.Pos // Position of "as" (optional)
+	Columns []Expr    // Output columns (optional)
+	WithPos token.Pos // Position of "with" (optional)
+	Options []Expr    // Options (optional)
+}
+
+func (x *ParseKvOp) Pos() token.Pos { return x.Pipe }
+
+func (x *ParseKvOp) End() token.Pos {
+	if len(x.Options) > 0 {
+		return x.Options[len(x.Options)-1].End()
+	}
+	if len(x.Columns) > 0 {
+		return x.Columns[len(x.Columns)-1].End()
+	}
+	return x.Source.End()
+}
+
 // MvExpandOp represents an mv-expand operator.
 type MvExpandOp struct {
 	Pipe     token.Pos // Position of "|"
@@ -506,6 +540,166 @@ func (x *FacetOp) End() token.Pos {
 	}
 	return x.ByPos + 2
 }
+
+// ProjectKeepOp represents a project-keep operator.
+type ProjectKeepOp struct {
+	Pipe        token.Pos // Position of "|"
+	ProjectKeep token.Pos // Position of "project-keep"
+	Columns     []*Ident  // Columns to keep
+}
+
+func (x *ProjectKeepOp) Pos() token.Pos { return x.Pipe }
+
+func (x *ProjectKeepOp) End() token.Pos {
+	if len(x.Columns) > 0 {
+		return x.Columns[len(x.Columns)-1].End()
+	}
+	return x.ProjectKeep + 12 // len("project-keep")
+}
+
+// TopNestedOp represents a top-nested operator.
+type TopNestedOp struct {
+	Pipe      token.Pos      // Position of "|"
+	TopNested token.Pos      // Position of "top-nested"
+	Clauses   []*TopNestedClause
+	EndPos    token.Pos
+}
+
+func (x *TopNestedOp) Pos() token.Pos { return x.Pipe }
+func (x *TopNestedOp) End() token.Pos { return x.EndPos }
+
+// TopNestedClause represents one level in top-nested.
+type TopNestedClause struct {
+	Count  Expr      // Number of top values
+	OfPos  token.Pos // Position of "of"
+	Column Expr      // Column expression
+	ByPos  token.Pos // Position of "by"
+	ByExpr Expr      // Order by expression
+	With   token.Pos // Position of "with" (optional)
+	Others Expr      // "with others" expression (optional)
+}
+
+func (x *TopNestedClause) Pos() token.Pos { return x.Count.Pos() }
+func (x *TopNestedClause) End() token.Pos {
+	if x.Others != nil {
+		return x.Others.End()
+	}
+	return x.ByExpr.End()
+}
+
+// TopHittersOp represents a top-hitters operator.
+type TopHittersOp struct {
+	Pipe       token.Pos // Position of "|"
+	TopHitters token.Pos // Position of "top-hitters"
+	Count      Expr      // Number of top hitters
+	OfPos      token.Pos // Position of "of"
+	Column     Expr      // Column to analyze
+	ByPos      token.Pos // Position of "by" (optional)
+	ByExpr     Expr      // Weight expression (optional)
+}
+
+func (x *TopHittersOp) Pos() token.Pos { return x.Pipe }
+
+func (x *TopHittersOp) End() token.Pos {
+	if x.ByExpr != nil {
+		return x.ByExpr.End()
+	}
+	return x.Column.End()
+}
+
+// MvApplyOp represents an mv-apply operator.
+type MvApplyOp struct {
+	Pipe    token.Pos    // Position of "|"
+	MvApply token.Pos    // Position of "mv-apply"
+	Items   []*NamedExpr // Items to apply (name = expr or just expr)
+	OnPos   token.Pos    // Position of "on"
+	OnExpr  *PipeExpr    // Subquery to apply
+}
+
+func (x *MvApplyOp) Pos() token.Pos { return x.Pipe }
+func (x *MvApplyOp) End() token.Pos { return x.OnExpr.End() }
+
+// FindOp represents a find operator.
+type FindOp struct {
+	Pipe       token.Pos // Position of "|"
+	Find       token.Pos // Position of "find"
+	InPos      token.Pos // Position of "in" (optional)
+	Tables     []Expr    // Tables to search (optional)
+	WherePos   token.Pos // Position of "where"
+	Predicate  Expr      // Search predicate
+	ProjectPos token.Pos // Position of "project" (optional)
+	Columns    []Expr    // Projected columns (optional)
+}
+
+func (x *FindOp) Pos() token.Pos { return x.Pipe }
+
+func (x *FindOp) End() token.Pos {
+	if len(x.Columns) > 0 {
+		return x.Columns[len(x.Columns)-1].End()
+	}
+	return x.Predicate.End()
+}
+
+// PrintStmt represents a print statement (not a pipe operator).
+type PrintStmt struct {
+	Print   token.Pos    // Position of "print"
+	Columns []*NamedExpr // Values to print
+}
+
+func (x *PrintStmt) Pos() token.Pos { return x.Print }
+
+func (x *PrintStmt) End() token.Pos {
+	if len(x.Columns) > 0 {
+		return x.Columns[len(x.Columns)-1].End()
+	}
+	return x.Print + 5 // len("print")
+}
+
+// RangeStmt represents a range statement.
+type RangeStmt struct {
+	Range  token.Pos // Position of "range"
+	Column *Ident    // Column name
+	From   Expr      // Start value
+	To     Expr      // End value
+	Step   Expr      // Step value
+}
+
+func (x *RangeStmt) Pos() token.Pos { return x.Range }
+func (x *RangeStmt) End() token.Pos { return x.Step.End() }
+
+// DatatableStmt represents a datatable statement.
+type DatatableStmt struct {
+	Datatable token.Pos         // Position of "datatable"
+	Columns   []*ColumnDeclExpr // Column declarations
+	Values    []Expr            // Row values
+	EndPos    token.Pos
+}
+
+func (x *DatatableStmt) Pos() token.Pos { return x.Datatable }
+func (x *DatatableStmt) End() token.Pos { return x.EndPos }
+
+// ColumnDeclExpr represents a column declaration (name:type).
+type ColumnDeclExpr struct {
+	Name  *Ident    // Column name
+	Colon token.Pos // Position of ":"
+	Type  *Ident    // Type name
+}
+
+func (x *ColumnDeclExpr) Pos() token.Pos { return x.Name.Pos() }
+func (x *ColumnDeclExpr) End() token.Pos { return x.Type.End() }
+
+// ExternalDataOp represents an externaldata operator.
+type ExternalDataOp struct {
+	ExternalData token.Pos         // Position of "externaldata"
+	Columns      []*ColumnDeclExpr // Column declarations
+	URIs         []Expr            // Data source URIs
+	WithPos      token.Pos         // Position of "with" (optional)
+	Properties   []Expr            // Properties (optional)
+	EndPos       token.Pos
+}
+
+func (x *ExternalDataOp) Pos() token.Pos { return x.ExternalData }
+func (x *ExternalDataOp) End() token.Pos { return x.EndPos }
 
 // GenericOp represents an unrecognized or less common operator.
 // This allows parsing to continue even with operators we don't fully support.

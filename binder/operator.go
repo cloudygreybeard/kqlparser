@@ -41,6 +41,10 @@ func (b *Binder) bindOperator(op ast.Operator, inputType types.Type) types.Type 
 		return b.bindRenderOp(o, inputType)
 	case *ast.ParseOp:
 		return b.bindParseOp(o, inputType)
+	case *ast.ParseWhereOp:
+		return b.bindParseWhereOp(o, inputType)
+	case *ast.ParseKvOp:
+		return b.bindParseKvOp(o, inputType)
 	case *ast.GenericOp:
 		return b.bindGenericOp(o, inputType)
 	case *ast.ProjectRenameOp:
@@ -75,6 +79,18 @@ func (b *Binder) bindOperator(op ast.Operator, inputType types.Type) types.Type 
 		return b.bindForkOp(o, inputType)
 	case *ast.FacetOp:
 		return b.bindFacetOp(o, inputType)
+	case *ast.ProjectKeepOp:
+		return b.bindProjectKeepOp(o, inputType)
+	case *ast.TopNestedOp:
+		return b.bindTopNestedOp(o, inputType)
+	case *ast.TopHittersOp:
+		return b.bindTopHittersOp(o, inputType)
+	case *ast.MvApplyOp:
+		return b.bindMvApplyOp(o, inputType)
+	case *ast.FindOp:
+		return b.bindFindOp(o, inputType)
+	case *ast.ExternalDataOp:
+		return b.bindExternalDataOp(o, inputType)
 	default:
 		return inputType
 	}
@@ -562,5 +578,165 @@ func (b *Binder) bindFacetOp(op *ast.FacetOp, inputType types.Type) types.Type {
 		b.bindExpr(op.Query)
 	}
 	// Facet returns multiple tables - one per facet column plus optional with result
+	return inputType
+}
+
+// bindProjectKeepOp binds a project-keep operator.
+func (b *Binder) bindProjectKeepOp(op *ast.ProjectKeepOp, inputType types.Type) types.Type {
+	// project-keep keeps only the specified columns from input
+	tab, ok := inputType.(*types.Tabular)
+	if !ok {
+		return inputType
+	}
+
+	// Build new schema with only kept columns
+	var cols []*types.Column
+	for _, ident := range op.Columns {
+		// Find matching column in input
+		for _, col := range tab.Columns {
+			if col.Name == ident.Name {
+				cols = append(cols, col)
+				break
+			}
+		}
+	}
+
+	newSchema := types.NewTabular(cols...)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindTopNestedOp binds a top-nested operator.
+func (b *Binder) bindTopNestedOp(op *ast.TopNestedOp, inputType types.Type) types.Type {
+	// Bind clause expressions
+	for _, clause := range op.Clauses {
+		if clause.Count != nil {
+			b.bindExpr(clause.Count)
+		}
+		if clause.Column != nil {
+			b.bindExpr(clause.Column)
+		}
+		if clause.ByExpr != nil {
+			b.bindExpr(clause.ByExpr)
+		}
+		if clause.Others != nil {
+			b.bindExpr(clause.Others)
+		}
+	}
+	// top-nested produces hierarchical output - simplified to return dynamic
+	return types.NewTabular(
+		&types.Column{Name: "aggregated_column", Type: types.Typ_Dynamic},
+	)
+}
+
+// bindTopHittersOp binds a top-hitters operator.
+func (b *Binder) bindTopHittersOp(op *ast.TopHittersOp, inputType types.Type) types.Type {
+	if op.Count != nil {
+		b.bindExpr(op.Count)
+	}
+	if op.Column != nil {
+		b.bindExpr(op.Column)
+	}
+	if op.ByExpr != nil {
+		b.bindExpr(op.ByExpr)
+	}
+	// top-hitters returns column value and approximate count
+	return types.NewTabular(
+		&types.Column{Name: "column", Type: types.Typ_Dynamic},
+		&types.Column{Name: "approximate_count_column", Type: types.Typ_Long},
+	)
+}
+
+// bindMvApplyOp binds an mv-apply operator.
+func (b *Binder) bindMvApplyOp(op *ast.MvApplyOp, inputType types.Type) types.Type {
+	// Bind item expressions
+	for _, item := range op.Items {
+		if item != nil {
+			b.bindExpr(item.Expr)
+		}
+	}
+	// Bind the on subquery
+	if op.OnExpr != nil {
+		b.bindExpr(op.OnExpr)
+	}
+	// mv-apply expands and applies - returns modified input schema
+	return inputType
+}
+
+// bindFindOp binds a find operator.
+func (b *Binder) bindFindOp(op *ast.FindOp, inputType types.Type) types.Type {
+	// Bind table expressions
+	for _, table := range op.Tables {
+		b.bindExpr(table)
+	}
+	// Bind predicate
+	if op.Predicate != nil {
+		b.bindExpr(op.Predicate)
+	}
+	// Bind projected columns
+	for _, col := range op.Columns {
+		b.bindExpr(col)
+	}
+	// find returns source_, pack_ and any projected columns
+	cols := []*types.Column{
+		{Name: "source_", Type: types.Typ_String},
+		{Name: "pack_", Type: types.Typ_Dynamic},
+	}
+	newSchema := types.NewTabular(cols...)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindExternalDataOp binds an externaldata operator.
+func (b *Binder) bindExternalDataOp(op *ast.ExternalDataOp, inputType types.Type) types.Type {
+	// Build schema from column declarations
+	var cols []*types.Column
+	for _, decl := range op.Columns {
+		colType := b.resolveTypeName(decl.Type.Name)
+		cols = append(cols, &types.Column{Name: decl.Name.Name, Type: colType})
+	}
+	// Bind URI expressions
+	for _, uri := range op.URIs {
+		b.bindExpr(uri)
+	}
+	// Bind property expressions
+	for _, prop := range op.Properties {
+		b.bindExpr(prop)
+	}
+	newSchema := types.NewTabular(cols...)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindParseWhereOp binds a parse-where operator.
+func (b *Binder) bindParseWhereOp(op *ast.ParseWhereOp, inputType types.Type) types.Type {
+	// Bind source and pattern
+	if op.Source != nil {
+		b.bindExpr(op.Source)
+	}
+	if op.Pattern != nil {
+		b.bindExpr(op.Pattern)
+	}
+	// parse-where filters rows and may add columns from pattern capture groups
+	// Simplified: return input schema unchanged (pattern extraction would add columns)
+	return inputType
+}
+
+// bindParseKvOp binds a parse-kv operator.
+func (b *Binder) bindParseKvOp(op *ast.ParseKvOp, inputType types.Type) types.Type {
+	// Bind source
+	if op.Source != nil {
+		b.bindExpr(op.Source)
+	}
+	// Bind column expressions
+	for _, col := range op.Columns {
+		b.bindExpr(col)
+	}
+	// Bind option expressions
+	for _, opt := range op.Options {
+		b.bindExpr(opt)
+	}
+	// parse-kv adds columns for each key-value pair extracted
+	// Return input type (actual columns depend on data)
 	return inputType
 }

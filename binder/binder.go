@@ -158,6 +158,34 @@ func (b *Binder) recordSymbol(ident *ast.Ident, sym symbol.Symbol) {
 	b.symbols[ident] = sym
 }
 
+// resolveTypeName resolves a type name string to a Type.
+func (b *Binder) resolveTypeName(name string) types.Type {
+	switch name {
+	case "string":
+		return types.Typ_String
+	case "long", "int64":
+		return types.Typ_Long
+	case "int", "int32":
+		return types.Typ_Int
+	case "real", "double":
+		return types.Typ_Real
+	case "bool", "boolean":
+		return types.Typ_Bool
+	case "datetime", "date":
+		return types.Typ_DateTime
+	case "timespan":
+		return types.Typ_TimeSpan
+	case "guid", "uuid":
+		return types.Typ_Guid
+	case "dynamic":
+		return types.Typ_Dynamic
+	case "decimal":
+		return types.Typ_Decimal
+	default:
+		return types.Typ_Unknown
+	}
+}
+
 // bindStmt binds a statement.
 func (b *Binder) bindStmt(stmt ast.Stmt) types.Type {
 	switch s := stmt.(type) {
@@ -165,6 +193,14 @@ func (b *Binder) bindStmt(stmt ast.Stmt) types.Type {
 		return b.bindLetStmt(s)
 	case *ast.ExprStmt:
 		return b.bindExpr(s.X)
+	case *ast.PrintStmt:
+		return b.bindPrintStmt(s)
+	case *ast.RangeStmt:
+		return b.bindRangeStmt(s)
+	case *ast.DatatableStmt:
+		return b.bindDatatableStmt(s)
+	case *ast.ExternalDataOp:
+		return b.bindExternalDataOp(s, types.Typ_Unknown)
 	default:
 		return types.Typ_Unknown
 	}
@@ -181,6 +217,59 @@ func (b *Binder) bindLetStmt(stmt *ast.LetStmt) types.Type {
 	b.recordSymbol(stmt.Name, varSym)
 
 	return valueType
+}
+
+// bindPrintStmt binds a print statement.
+func (b *Binder) bindPrintStmt(stmt *ast.PrintStmt) types.Type {
+	// Print produces a single-row table with the evaluated expressions
+	var cols []*types.Column
+	for i, named := range stmt.Columns {
+		exprType := b.bindExpr(named.Expr)
+		name := fmt.Sprintf("print_%d", i)
+		if named.Name != nil {
+			name = named.Name.Name
+		}
+		cols = append(cols, &types.Column{Name: name, Type: exprType})
+	}
+	newSchema := types.NewTabular(cols...)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindRangeStmt binds a range statement.
+func (b *Binder) bindRangeStmt(stmt *ast.RangeStmt) types.Type {
+	// Bind the expressions
+	b.bindExpr(stmt.From)
+	b.bindExpr(stmt.To)
+	b.bindExpr(stmt.Step)
+
+	// Range produces a single-column table
+	colName := "range_column"
+	if stmt.Column != nil {
+		colName = stmt.Column.Name
+	}
+	newSchema := types.NewTabular(
+		&types.Column{Name: colName, Type: types.Typ_Long},
+	)
+	b.updateRowScope(newSchema)
+	return newSchema
+}
+
+// bindDatatableStmt binds a datatable statement.
+func (b *Binder) bindDatatableStmt(stmt *ast.DatatableStmt) types.Type {
+	// Build schema from column declarations
+	var cols []*types.Column
+	for _, decl := range stmt.Columns {
+		colType := b.resolveTypeName(decl.Type.Name)
+		cols = append(cols, &types.Column{Name: decl.Name.Name, Type: colType})
+	}
+	// Bind value expressions
+	for _, val := range stmt.Values {
+		b.bindExpr(val)
+	}
+	newSchema := types.NewTabular(cols...)
+	b.updateRowScope(newSchema)
+	return newSchema
 }
 
 // bindExpr binds an expression and returns its type.

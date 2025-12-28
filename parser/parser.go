@@ -154,6 +154,14 @@ func (p *Parser) parseStmt() ast.Stmt {
 	switch p.tok {
 	case token.LET:
 		return p.parseLetStmt()
+	case token.PRINT:
+		return p.parsePrintStmt()
+	case token.RANGE:
+		return p.parseRangeStmt()
+	case token.DATATABLE:
+		return p.parseDatatableStmt()
+	case token.EXTERNALDATA:
+		return p.parseExternalDataStmt()
 	default:
 		// Expression statement (query)
 		expr := p.parseExpr()
@@ -183,6 +191,179 @@ func (p *Parser) parseLetStmt() *ast.LetStmt {
 		Assign: assignPos,
 		Value:  value,
 	}
+}
+
+// parsePrintStmt parses a print statement.
+func (p *Parser) parsePrintStmt() *ast.PrintStmt {
+	printPos := p.pos
+	p.next() // consume 'print'
+
+	stmt := &ast.PrintStmt{Print: printPos}
+
+	// Parse column expressions
+	for p.tok != token.SEMI && p.tok != token.EOF && p.tok != token.PIPE {
+		item := p.parseNamedExprSingle()
+		stmt.Columns = append(stmt.Columns, item)
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	return stmt
+}
+
+// parseRangeStmt parses a range statement.
+func (p *Parser) parseRangeStmt() *ast.RangeStmt {
+	rangePos := p.pos
+	p.next() // consume 'range'
+
+	stmt := &ast.RangeStmt{Range: rangePos}
+
+	// Parse column name
+	stmt.Column = p.parseIdent()
+
+	// Expect 'from'
+	if p.tok == token.FROM {
+		p.next()
+	}
+
+	// Parse start value
+	stmt.From = p.parseUnaryExpr()
+
+	// Expect 'to'
+	if p.tok == token.TO {
+		p.next()
+	}
+
+	// Parse end value
+	stmt.To = p.parseUnaryExpr()
+
+	// Expect 'step'
+	if p.tok == token.STEP {
+		p.next()
+	}
+
+	// Parse step value
+	stmt.Step = p.parseUnaryExpr()
+
+	return stmt
+}
+
+// parseDatatableStmt parses a datatable statement.
+func (p *Parser) parseDatatableStmt() *ast.DatatableStmt {
+	datatablePos := p.pos
+	p.next() // consume 'datatable'
+
+	stmt := &ast.DatatableStmt{Datatable: datatablePos}
+
+	// Parse column schema: (name:type, name:type, ...)
+	if p.tok == token.LPAREN {
+		p.next()
+		for p.tok != token.RPAREN && p.tok != token.EOF {
+			col := p.parseColumnDecl()
+			if col != nil {
+				stmt.Columns = append(stmt.Columns, col)
+			}
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+		p.expect(token.RPAREN)
+	}
+
+	// Parse values: [value, value, ...]
+	if p.tok == token.LBRACKET {
+		p.next()
+		for p.tok != token.RBRACKET && p.tok != token.EOF {
+			val := p.parseUnaryExpr()
+			stmt.Values = append(stmt.Values, val)
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+		stmt.EndPos = p.pos
+		p.expect(token.RBRACKET)
+	}
+
+	return stmt
+}
+
+// parseColumnDecl parses a column declaration (name:type).
+func (p *Parser) parseColumnDecl() *ast.ColumnDeclExpr {
+	name := p.parseIdent()
+	if name == nil {
+		return nil
+	}
+
+	colonPos := p.expect(token.COLON)
+
+	typeName := p.parseIdent()
+	if typeName == nil {
+		return nil
+	}
+
+	return &ast.ColumnDeclExpr{
+		Name:  name,
+		Colon: colonPos,
+		Type:  typeName,
+	}
+}
+
+// parseExternalDataStmt parses an externaldata statement.
+func (p *Parser) parseExternalDataStmt() *ast.ExternalDataOp {
+	externalDataPos := p.pos
+	p.next() // consume 'externaldata'
+
+	op := &ast.ExternalDataOp{ExternalData: externalDataPos}
+
+	// Parse column schema: (name:type, name:type, ...)
+	if p.tok == token.LPAREN {
+		p.next()
+		for p.tok != token.RPAREN && p.tok != token.EOF {
+			col := p.parseColumnDecl()
+			if col != nil {
+				op.Columns = append(op.Columns, col)
+			}
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+		p.expect(token.RPAREN)
+	}
+
+	// Parse URIs: [uri, uri, ...]
+	if p.tok == token.LBRACKET {
+		p.next()
+		for p.tok != token.RBRACKET && p.tok != token.EOF {
+			uri := p.parseUnaryExpr()
+			op.URIs = append(op.URIs, uri)
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+		op.EndPos = p.pos
+		p.expect(token.RBRACKET)
+	}
+
+	// Parse optional 'with (props)'
+	if p.tok == token.WITH {
+		op.WithPos = p.pos
+		p.next()
+		if p.tok == token.LPAREN {
+			p.next()
+			for p.tok != token.RPAREN && p.tok != token.EOF {
+				prop := p.parseUnaryExpr()
+				op.Properties = append(op.Properties, prop)
+				if !p.accept(token.COMMA) {
+					break
+				}
+			}
+			op.EndPos = p.pos
+			p.expect(token.RPAREN)
+		}
+	}
+
+	return op
 }
 
 // parseExpr parses an expression (may include pipe operators).

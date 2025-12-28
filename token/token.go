@@ -83,6 +83,8 @@ const (
 	MVEXPAND
 	ORDER
 	PARSE
+	PARSEKV
+	PARSEWHERE
 	PARTITION
 	PRINT
 	PROJECT
@@ -257,6 +259,8 @@ var tokenStrings = [...]string{
 	MVEXPAND:       "mv-expand",
 	ORDER:          "order",
 	PARSE:          "parse",
+	PARSEKV:        "parse-kv",
+	PARSEWHERE:     "parse-where",
 	PARTITION:      "partition",
 	PRINT:          "print",
 	PROJECT:        "project",

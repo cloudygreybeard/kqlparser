@@ -219,4 +219,3 @@ func BenchmarkThroughput_100KB(b *testing.B) {
 	src := strings.Repeat(queryMedium, 500)
 	benchmarkParser(b, src)
 }
-

@@ -432,3 +432,35 @@ func TestASTPrint(t *testing.T) {
 		t.Errorf("expected WhereOp in output: %s", output)
 	}
 }
+
+func TestNewOperators(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+	}{
+		{"project-keep", "T | project-keep a, b, c"},
+		{"top-nested", "T | top-nested 3 of State by sum(Damage)"},
+		{"top-hitters", "T | top-hitters 10 of EventType"},
+		{"mv-apply", "T | mv-apply x = Items on (x | take 1)"},
+		{"find", "find where EventType == 'Flood'"},
+		{"print", "print x = 1, y = 'hello'"},
+		{"range", "range x from 1 to 10 step 1"},
+		{"datatable", "datatable(Name:string, Age:long) ['Alice', 30, 'Bob', 25]"},
+		{"externaldata", "externaldata(x:string) ['https://example.com/data.csv']"},
+		{"parse-where", "T | parse-where Message '*error*'"},
+		{"parse-kv", "T | parse-kv Data as (key1, key2)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := New("test", tt.src)
+			script := p.Parse()
+			if errs := p.Errors(); len(errs) > 0 {
+				t.Errorf("parse errors for %q: %v", tt.src, errs)
+			}
+			if len(script.Stmts) == 0 {
+				t.Errorf("expected at least one statement for %q", tt.src)
+			}
+		})
+	}
+}

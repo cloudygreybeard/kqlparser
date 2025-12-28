@@ -66,6 +66,8 @@ func (*UnionOp) node()          {}
 func (*LookupOp) node()         {}
 func (*RenderOp) node()         {}
 func (*ParseOp) node()          {}
+func (*ParseWhereOp) node()     {}
+func (*ParseKvOp) node()        {}
 func (*MvExpandOp) node()       {}
 func (*MakeSeriesOp) node()     {}
 func (*SearchOp) node()         {}
@@ -81,6 +83,15 @@ func (*EvaluateOp) node()       {}
 func (*ReduceOp) node()         {}
 func (*ForkOp) node()           {}
 func (*FacetOp) node()          {}
+func (*ProjectKeepOp) node()    {}
+func (*TopNestedOp) node()      {}
+func (*TopHittersOp) node()     {}
+func (*MvApplyOp) node()        {}
+func (*FindOp) node()           {}
+func (*PrintStmt) node()        {}
+func (*RangeStmt) node()        {}
+func (*DatatableStmt) node()    {}
+func (*ExternalDataOp) node()   {}
 func (*GenericOp) node()        {}
 func (*Script) node()           {}
 
@@ -102,9 +113,13 @@ func (*NamedExpr) expr()    {}
 func (*PipeExpr) expr()     {}
 
 // Statement nodes implement Stmt
-func (*LetStmt) stmt()   {}
-func (*ExprStmt) stmt()  {}
-func (*QueryStmt) stmt() {}
+func (*LetStmt) stmt()       {}
+func (*ExprStmt) stmt()      {}
+func (*QueryStmt) stmt()     {}
+func (*PrintStmt) stmt()     {}
+func (*RangeStmt) stmt()     {}
+func (*DatatableStmt) stmt() {}
+func (*ExternalDataOp) stmt() {}
 
 // Operator nodes implement Operator
 func (*WhereOp) operator()          {}
@@ -124,6 +139,8 @@ func (*UnionOp) operator()          {}
 func (*LookupOp) operator()         {}
 func (*RenderOp) operator()         {}
 func (*ParseOp) operator()          {}
+func (*ParseWhereOp) operator()     {}
+func (*ParseKvOp) operator()        {}
 func (*MvExpandOp) operator()       {}
 func (*MakeSeriesOp) operator()     {}
 func (*SearchOp) operator()         {}
@@ -139,4 +156,10 @@ func (*EvaluateOp) operator()       {}
 func (*ReduceOp) operator()         {}
 func (*ForkOp) operator()           {}
 func (*FacetOp) operator()          {}
+func (*ProjectKeepOp) operator()    {}
+func (*TopNestedOp) operator()      {}
+func (*TopHittersOp) operator()     {}
+func (*MvApplyOp) operator()        {}
+func (*FindOp) operator()           {}
+func (*ExternalDataOp) operator()   {}
 func (*GenericOp) operator()        {}
