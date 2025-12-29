@@ -426,11 +426,22 @@ func (p *Parser) parseCompareExpr() ast.Expr {
 	switch p.tok {
 	case token.EQL, token.NEQ, token.LSS, token.GTR, token.LEQ, token.GEQ,
 		token.TILDE, token.NTILDE,
-		token.CONTAINS, token.CONTAINSCS, token.NOTCONTAINS, token.NOTCONTAINSCS,
-		token.STARTSWITH, token.STARTSWITHCS, token.ENDSWITH, token.ENDSWITHCS,
+		// Positive string operators
+		token.CONTAINS, token.CONTAINSCS,
+		token.STARTSWITH, token.STARTSWITHCS,
+		token.ENDSWITH, token.ENDSWITHCS,
 		token.HAS, token.HASCS, token.HASALL, token.HASANY,
-		token.HASPREFIX, token.HASPREFIXCS, token.HASSUFFIX, token.HASSUFFIXCS,
-		token.LIKE, token.MATCHESREGEX:
+		token.HASPREFIX, token.HASPREFIXCS,
+		token.HASSUFFIX, token.HASSUFFIXCS,
+		token.LIKE, token.LIKECS, token.MATCHESREGEX,
+		// Negated string operators
+		token.NOTCONTAINS, token.NOTCONTAINSCS,
+		token.NOTSTARTSWITH, token.NOTSTARTSWITCS,
+		token.NOTENDSWITH, token.NOTENDSWITHCS,
+		token.NOTHAS, token.NOTHASCS,
+		token.NOTHASPREFIX, token.NOTHASPREFIXCS,
+		token.NOTHASSUFFIX, token.NOTHASSUFFIXCS,
+		token.NOTLIKE, token.NOTLIKECS:
 		opPos := p.pos
 		op := p.tok
 		p.next()
@@ -438,19 +449,26 @@ func (p *Parser) parseCompareExpr() ast.Expr {
 		return &ast.BinaryExpr{X: left, OpPos: opPos, Op: op, Y: right}
 
 	case token.IN:
-		return p.parseInExpr(left)
+		return p.parseInExpr(left, false)
+
+	case token.NOTIN, token.NOTINCI:
+		return p.parseInExpr(left, true)
 
 	case token.BETWEEN:
 		return p.parseBetweenExpr(left, false)
+
+	case token.NOTBETWEEN:
+		return p.parseBetweenExpr(left, true)
 	}
 
 	return left
 }
 
-// parseInExpr parses an 'in' expression.
-func (p *Parser) parseInExpr(left ast.Expr) ast.Expr {
+// parseInExpr parses an 'in' or '!in' expression.
+func (p *Parser) parseInExpr(left ast.Expr, not bool) ast.Expr {
 	opPos := p.pos
-	p.next() // consume 'in'
+	op := p.tok
+	p.next() // consume 'in' or '!in' or '!in~'
 
 	lparen := p.expect(token.LPAREN)
 	var elems []ast.Expr
@@ -464,7 +482,7 @@ func (p *Parser) parseInExpr(left ast.Expr) ast.Expr {
 	rparen := p.expect(token.RPAREN)
 
 	list := &ast.ListExpr{Lparen: lparen, Elems: elems, Rparen: rparen}
-	return &ast.BinaryExpr{X: left, OpPos: opPos, Op: token.IN, Y: list}
+	return &ast.BinaryExpr{X: left, OpPos: opPos, Op: op, Y: list}
 }
 
 // parseBetweenExpr parses a 'between' expression.
@@ -798,20 +816,35 @@ func (p *Parser) continueBinaryExpr(left ast.Expr) ast.Expr {
 	switch p.tok {
 	case token.EQL, token.NEQ, token.LSS, token.GTR, token.LEQ, token.GEQ,
 		token.TILDE, token.NTILDE,
-		token.CONTAINS, token.CONTAINSCS, token.NOTCONTAINS, token.NOTCONTAINSCS,
-		token.STARTSWITH, token.STARTSWITHCS, token.ENDSWITH, token.ENDSWITHCS,
+		// Positive string operators
+		token.CONTAINS, token.CONTAINSCS,
+		token.STARTSWITH, token.STARTSWITHCS,
+		token.ENDSWITH, token.ENDSWITHCS,
 		token.HAS, token.HASCS, token.HASALL, token.HASANY,
-		token.HASPREFIX, token.HASPREFIXCS, token.HASSUFFIX, token.HASSUFFIXCS,
-		token.LIKE, token.MATCHESREGEX:
+		token.HASPREFIX, token.HASPREFIXCS,
+		token.HASSUFFIX, token.HASSUFFIXCS,
+		token.LIKE, token.LIKECS, token.MATCHESREGEX,
+		// Negated string operators
+		token.NOTCONTAINS, token.NOTCONTAINSCS,
+		token.NOTSTARTSWITH, token.NOTSTARTSWITCS,
+		token.NOTENDSWITH, token.NOTENDSWITHCS,
+		token.NOTHAS, token.NOTHASCS,
+		token.NOTHASPREFIX, token.NOTHASPREFIXCS,
+		token.NOTHASSUFFIX, token.NOTHASSUFFIXCS,
+		token.NOTLIKE, token.NOTLIKECS:
 		opPos := p.pos
 		op := p.tok
 		p.next()
 		right := p.parseAddExpr()
 		left = &ast.BinaryExpr{X: left, OpPos: opPos, Op: op, Y: right}
 	case token.IN:
-		left = p.parseInExpr(left)
+		left = p.parseInExpr(left, false)
+	case token.NOTIN, token.NOTINCI:
+		left = p.parseInExpr(left, true)
 	case token.BETWEEN:
 		left = p.parseBetweenExpr(left, false)
+	case token.NOTBETWEEN:
+		left = p.parseBetweenExpr(left, true)
 	}
 
 	// Handle and

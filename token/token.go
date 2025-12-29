@@ -163,7 +163,7 @@ const (
 	STRINGTYPE
 	TIMESPANTYPE
 
-	// Keywords - String operators
+	// Keywords - String operators (positive)
 	CONTAINS
 	CONTAINSCS
 	ENDSWITH
@@ -177,11 +177,31 @@ const (
 	HASSUFFIX
 	HASSUFFIXCS
 	LIKE
+	LIKECS
 	MATCHESREGEX
-	NOTCONTAINS
-	NOTCONTAINSCS
 	STARTSWITH
 	STARTSWITHCS
+
+	// Keywords - String operators (negated)
+	NOTCONTAINS    // !contains
+	NOTCONTAINSCS  // !contains_cs
+	NOTENDSWITH    // !endswith
+	NOTENDSWITHCS  // !endswith_cs
+	NOTHAS         // !has
+	NOTHASCS       // !has_cs
+	NOTHASPREFIX   // !hasprefix
+	NOTHASPREFIXCS // !hasprefix_cs
+	NOTHASSUFFIX   // !hassuffix
+	NOTHASSUFFIXCS // !hassuffix_cs
+	NOTLIKE        // notlike
+	NOTLIKECS      // notlikecs
+	NOTSTARTSWITH  // !startswith
+	NOTSTARTSWITCS // !startswith_cs
+
+	// Keywords - Negated list/range operators
+	NOTBETWEEN // !between
+	NOTIN      // !in
+	NOTINCI    // !in~ (case-insensitive)
 
 	// Keywords - Misc
 	CLUSTER
@@ -343,12 +363,33 @@ var tokenStrings = [...]string{
 	HASSUFFIX:      "hassuffix",
 	HASSUFFIXCS:    "hassuffix_cs",
 	LIKE:           "like",
+	LIKECS:         "likecs",
 	MATCHESREGEX:   "matches regex",
-	NOTCONTAINS:    "notcontains",
-	NOTCONTAINSCS:  "notcontains_cs",
 	STARTSWITH:     "startswith",
 	STARTSWITHCS:   "startswith_cs",
-	CLUSTER:        "cluster",
+
+	// Negated string operators
+	NOTCONTAINS:    "!contains",
+	NOTCONTAINSCS:  "!contains_cs",
+	NOTENDSWITH:    "!endswith",
+	NOTENDSWITHCS:  "!endswith_cs",
+	NOTHAS:         "!has",
+	NOTHASCS:       "!has_cs",
+	NOTHASPREFIX:   "!hasprefix",
+	NOTHASPREFIXCS: "!hasprefix_cs",
+	NOTHASSUFFIX:   "!hassuffix",
+	NOTHASSUFFIXCS: "!hassuffix_cs",
+	NOTLIKE:        "notlike",
+	NOTLIKECS:      "notlikecs",
+	NOTSTARTSWITH:  "!startswith",
+	NOTSTARTSWITCS: "!startswith_cs",
+
+	// Negated list/range operators
+	NOTBETWEEN: "!between",
+	NOTIN:      "!in",
+	NOTINCI:    "!in~",
+
+	CLUSTER: "cluster",
 	NULL:           "null",
 	PACK:           "pack",
 	TYPEOF:         "typeof",
@@ -397,10 +438,11 @@ func init() {
 	keywords["date"] = DATETIMETYPE
 	keywords["time"] = TIMESPANTYPE
 	keywords["int64"] = LONGTYPE
-	keywords["!contains"] = NOTCONTAINS
-	keywords["!contains_cs"] = NOTCONTAINSCS
-	keywords["!has"] = HAS         // Maps to HAS but parser needs to check for !
-	keywords["!between"] = BETWEEN // Maps to BETWEEN but parser needs to check for !
+
+	// Alternative spellings for legacy notcontains/notlike (without !)
+	keywords["notcontains"] = NOTCONTAINS
+	keywords["notcontains_cs"] = NOTCONTAINSCS
+	keywords["notcontainscs"] = NOTCONTAINSCS
 }
 
 // Lookup returns the token type for the given identifier.
@@ -422,11 +464,18 @@ func (t Token) Precedence() int {
 	case AND:
 		return 2
 	case EQL, NEQ, LSS, GTR, LEQ, GEQ, TILDE, NTILDE,
-		CONTAINS, CONTAINSCS, NOTCONTAINS, NOTCONTAINSCS,
-		STARTSWITH, STARTSWITHCS, ENDSWITH, ENDSWITHCS,
-		HAS, HASCS, HASALL, HASANY,
+		// Positive string operators
+		CONTAINS, CONTAINSCS, STARTSWITH, STARTSWITHCS,
+		ENDSWITH, ENDSWITHCS, HAS, HASCS, HASALL, HASANY,
 		HASPREFIX, HASPREFIXCS, HASSUFFIX, HASSUFFIXCS,
-		LIKE, MATCHESREGEX, BETWEEN, IN:
+		LIKE, LIKECS, MATCHESREGEX,
+		// Negated string operators
+		NOTCONTAINS, NOTCONTAINSCS, NOTSTARTSWITH, NOTSTARTSWITCS,
+		NOTENDSWITH, NOTENDSWITHCS, NOTHAS, NOTHASCS,
+		NOTHASPREFIX, NOTHASPREFIXCS, NOTHASSUFFIX, NOTHASSUFFIXCS,
+		NOTLIKE, NOTLIKECS,
+		// List/range operators
+		BETWEEN, NOTBETWEEN, IN, NOTIN, NOTINCI:
 		return 3
 	case ADD, SUB:
 		return 4

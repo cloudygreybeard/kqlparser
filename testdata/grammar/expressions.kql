@@ -21,8 +21,12 @@ print 1 <> 2
 // Equality - List (in)
 T | where State in ("CA", "WA", "OR")
 
+T | where State !in ("TX", "FL")
+
 // Equality - Between
 T | where Value between (10 .. 20)
+
+T | where Value !between (0 .. 5)
 
 T | where Time between (datetime(2023-01-01) .. datetime(2023-12-31))
 
@@ -60,26 +64,44 @@ T | where Name =~ "test"
 // String Operators - has
 T | where Text has "word"
 
+T | where Text !has "word"
+
 // String Operators - hasprefix
 T | where Text hasprefix "pre"
+
+T | where Text !hasprefix "pre"
 
 // String Operators - hassuffix
 T | where Text hassuffix "suf"
 
+T | where Text !hassuffix "suf"
+
 // String Operators - contains
 T | where Text contains "sub"
 
+T | where Text !contains "sub"
+
 T | where Text contains_cs "Sub"
+
+T | where Text !contains_cs "Sub"
 
 // String Operators - startswith
 T | where Text startswith "begin"
 
+T | where Text !startswith "begin"
+
 T | where Text startswith_cs "Begin"
+
+T | where Text !startswith_cs "Begin"
 
 // String Operators - endswith
 T | where Text endswith "end"
 
+T | where Text !endswith "end"
+
 T | where Text endswith_cs "End"
+
+T | where Text !endswith_cs "End"
 
 // String Operators - matches regex
 T | where Text matches regex "^[a-z]+$"

@@ -244,11 +244,11 @@ func TestTokenPatterns(t *testing.T) {
 	}
 
 	// Test string operator tokens
-	// Note: Negated operators (!has, !contains, etc.) are not yet supported
 	stringOps := []struct {
 		op   string
 		skip bool
 	}{
+		// Positive operators
 		{"has", false},
 		{"has_cs", false},
 		{"hasprefix", false},
@@ -260,20 +260,20 @@ func TestTokenPatterns(t *testing.T) {
 		{"endswith", false},
 		{"endswith_cs", false},
 		{"matches regex", false},
-		// Negated operators - TODO: not yet supported
-		{"!has", true},
-		{"!has_cs", true},
-		{"!hasprefix", true},
-		{"!hasprefix_cs", true},
-		{"!hassuffix", true},
-		{"!hassuffix_cs", true},
-		{"!contains", true},
-		{"!contains_cs", true},
-		{"!startswith", true},
-		{"!startswith_cs", true},
-		{"!endswith", true},
-		{"!endswith_cs", true},
-		// like/notlike - TODO: not yet supported
+		// Negated operators - now supported!
+		{"!has", false},
+		{"!has_cs", false},
+		{"!hasprefix", false},
+		{"!hasprefix_cs", false},
+		{"!hassuffix", false},
+		{"!hassuffix_cs", false},
+		{"!contains", false},
+		{"!contains_cs", false},
+		{"!startswith", false},
+		{"!startswith_cs", false},
+		{"!endswith", false},
+		{"!endswith_cs", false},
+		// like/notlike - TODO: not yet fully supported
 		{"like", true},
 		{"notlike", true},
 		{"likecs", true},

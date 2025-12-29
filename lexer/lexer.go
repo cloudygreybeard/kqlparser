@@ -431,7 +431,10 @@ func (l *Lexer) scanOperator(pos token.Pos) Token {
 			l.next()
 			return Token{Type: token.NTILDE, Pos: pos, Lit: "!~"}
 		}
-		// Handle !contains, !has, etc. - these are scanned as IDENT with !
+		// Check for negated operators: !has, !contains, !between, !in, etc.
+		if isLetter(l.ch) {
+			return l.scanNegatedOperator(pos)
+		}
 		l.error(l.offset-1, "unexpected character '!'")
 		return Token{Type: token.ILLEGAL, Pos: pos, Lit: "!"}
 	case '<':
@@ -453,6 +456,92 @@ func (l *Lexer) scanOperator(pos token.Pos) Token {
 	default:
 		l.error(l.offset-1, fmt.Sprintf("unexpected character %q", ch))
 		return Token{Type: token.ILLEGAL, Pos: pos, Lit: string(ch)}
+	}
+}
+
+// scanNegatedOperator scans a negated operator like !has, !contains, !between, etc.
+// The '!' has already been consumed.
+func (l *Lexer) scanNegatedOperator(pos token.Pos) Token {
+	start := l.offset
+	for isLetter(l.ch) || l.ch == '_' {
+		l.next()
+	}
+	keyword := l.src[start:l.offset]
+
+	// Check for case-sensitive variants with _cs suffix
+	if l.ch == '_' {
+		savedOffset := l.offset
+		savedRdOffset := l.rdOffset
+		savedCh := l.ch
+		l.next() // consume _
+		suffixStart := l.offset
+		for isLetter(l.ch) {
+			l.next()
+		}
+		suffix := l.src[suffixStart:l.offset]
+		if suffix == "cs" {
+			keyword += "_cs"
+		} else {
+			// Not a _cs suffix, restore state
+			l.offset = savedOffset
+			l.rdOffset = savedRdOffset
+			l.ch = savedCh
+		}
+	}
+
+	// Check for case-insensitive suffix ~ (e.g., !in~)
+	if l.ch == '~' {
+		keyword += "~"
+		l.next()
+	}
+
+	// Map keyword to negated token
+	fullLit := "!" + keyword
+	tok := negatedOperatorLookup(keyword)
+	if tok != token.ILLEGAL {
+		return Token{Type: tok, Pos: pos, Lit: fullLit}
+	}
+
+	// Unknown negated operator
+	l.error(int(pos), fmt.Sprintf("unknown negated operator '!%s'", keyword))
+	return Token{Type: token.ILLEGAL, Pos: pos, Lit: fullLit}
+}
+
+// negatedOperatorLookup maps a keyword (without !) to its negated token.
+func negatedOperatorLookup(keyword string) token.Token {
+	switch keyword {
+	case "has":
+		return token.NOTHAS
+	case "has_cs":
+		return token.NOTHASCS
+	case "hasprefix":
+		return token.NOTHASPREFIX
+	case "hasprefix_cs":
+		return token.NOTHASPREFIXCS
+	case "hassuffix":
+		return token.NOTHASSUFFIX
+	case "hassuffix_cs":
+		return token.NOTHASSUFFIXCS
+	case "contains":
+		return token.NOTCONTAINS
+	case "contains_cs":
+		return token.NOTCONTAINSCS
+	case "startswith":
+		return token.NOTSTARTSWITH
+	case "startswith_cs":
+		return token.NOTSTARTSWITCS
+	case "endswith":
+		return token.NOTENDSWITH
+	case "endswith_cs":
+		return token.NOTENDSWITHCS
+	case "between":
+		return token.NOTBETWEEN
+	case "in":
+		return token.NOTIN
+	case "in~":
+		return token.NOTINCI
+	default:
+		return token.ILLEGAL
 	}
 }
 

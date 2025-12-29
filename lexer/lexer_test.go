@@ -183,3 +183,89 @@ func TestMatchesRegex(t *testing.T) {
 		}
 	}
 }
+
+func TestNegatedOperators(t *testing.T) {
+	tests := []struct {
+		src     string
+		tokType token.Token
+		lit     string
+	}{
+		// Negated string operators
+		{"!has", token.NOTHAS, "!has"},
+		{"!has_cs", token.NOTHASCS, "!has_cs"},
+		{"!hasprefix", token.NOTHASPREFIX, "!hasprefix"},
+		{"!hasprefix_cs", token.NOTHASPREFIXCS, "!hasprefix_cs"},
+		{"!hassuffix", token.NOTHASSUFFIX, "!hassuffix"},
+		{"!hassuffix_cs", token.NOTHASSUFFIXCS, "!hassuffix_cs"},
+		{"!contains", token.NOTCONTAINS, "!contains"},
+		{"!contains_cs", token.NOTCONTAINSCS, "!contains_cs"},
+		{"!startswith", token.NOTSTARTSWITH, "!startswith"},
+		{"!startswith_cs", token.NOTSTARTSWITCS, "!startswith_cs"},
+		{"!endswith", token.NOTENDSWITH, "!endswith"},
+		{"!endswith_cs", token.NOTENDSWITHCS, "!endswith_cs"},
+
+		// Negated list/range operators
+		{"!between", token.NOTBETWEEN, "!between"},
+		{"!in", token.NOTIN, "!in"},
+		{"!in~", token.NOTINCI, "!in~"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.src, func(t *testing.T) {
+			l := New("test", tt.src)
+			tok := l.Scan()
+			if tok.Type != tt.tokType {
+				t.Errorf("type: got %v, want %v", tok.Type, tt.tokType)
+			}
+			if tok.Lit != tt.lit {
+				t.Errorf("lit: got %q, want %q", tok.Lit, tt.lit)
+			}
+			if errs := l.Errors(); len(errs) > 0 {
+				t.Errorf("unexpected errors: %v", errs)
+			}
+		})
+	}
+}
+
+func TestNegatedOperatorsInContext(t *testing.T) {
+	tests := []struct {
+		src    string
+		tokens []token.Token
+	}{
+		{"x !has y", []token.Token{token.IDENT, token.NOTHAS, token.IDENT, token.EOF}},
+		{"x !contains y", []token.Token{token.IDENT, token.NOTCONTAINS, token.IDENT, token.EOF}},
+		{"x !between (1 .. 10)", []token.Token{
+			token.IDENT, token.NOTBETWEEN, token.LPAREN, token.INT, token.DOTDOT, token.INT, token.RPAREN, token.EOF,
+		}},
+		{"x !in (1, 2)", []token.Token{
+			token.IDENT, token.NOTIN, token.LPAREN, token.INT, token.COMMA, token.INT, token.RPAREN, token.EOF,
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.src, func(t *testing.T) {
+			l := New("test", tt.src)
+			var got []token.Token
+			for {
+				tok := l.Scan()
+				got = append(got, tok.Type)
+				if tok.Type == token.EOF {
+					break
+				}
+			}
+			if len(got) != len(tt.tokens) {
+				t.Errorf("token count: got %d, want %d", len(got), len(tt.tokens))
+				t.Errorf("got: %v", got)
+				return
+			}
+			for i, want := range tt.tokens {
+				if got[i] != want {
+					t.Errorf("token[%d]: got %v, want %v", i, got[i], want)
+				}
+			}
+			if errs := l.Errors(); len(errs) > 0 {
+				t.Errorf("unexpected errors: %v", errs)
+			}
+		})
+	}
+}

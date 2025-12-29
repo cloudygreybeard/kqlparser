@@ -53,9 +53,22 @@ func TestParseBinaryExprs(t *testing.T) {
 		{"a >= b", token.GEQ},
 		{"a and b", token.AND},
 		{"a or b", token.OR},
+		// Positive string operators
 		{"a contains b", token.CONTAINS},
 		{"a has b", token.HAS},
 		{"a startswith b", token.STARTSWITH},
+		{"a endswith b", token.ENDSWITH},
+		{"a hasprefix b", token.HASPREFIX},
+		{"a hassuffix b", token.HASSUFFIX},
+		// Negated string operators
+		{"a !contains b", token.NOTCONTAINS},
+		{"a !has b", token.NOTHAS},
+		{"a !startswith b", token.NOTSTARTSWITH},
+		{"a !endswith b", token.NOTENDSWITH},
+		{"a !hasprefix b", token.NOTHASPREFIX},
+		{"a !hassuffix b", token.NOTHASSUFFIX},
+		{"a !contains_cs b", token.NOTCONTAINSCS},
+		{"a !has_cs b", token.NOTHASCS},
 	}
 
 	for _, tt := range tests {
@@ -223,6 +236,22 @@ func TestParseBetweenExpr(t *testing.T) {
 	}
 }
 
+func TestParseNotBetweenExpr(t *testing.T) {
+	src := "x !between (10 .. 20)"
+	p := New("test", src)
+	expr := p.ParseExpr()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+	between, ok := expr.(*ast.BetweenExpr)
+	if !ok {
+		t.Fatalf("expected BetweenExpr, got %T", expr)
+	}
+	if !between.Not {
+		t.Error("expected Not=true for !between")
+	}
+}
+
 func TestParseInExpr(t *testing.T) {
 	src := `x in ("a", "b", "c")`
 	p := New("test", src)
@@ -243,6 +272,45 @@ func TestParseInExpr(t *testing.T) {
 	}
 	if len(list.Elems) != 3 {
 		t.Errorf("list elems: got %d, want 3", len(list.Elems))
+	}
+}
+
+func TestParseNotInExpr(t *testing.T) {
+	src := `x !in ("a", "b")`
+	p := New("test", src)
+	expr := p.ParseExpr()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+	bin, ok := expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected BinaryExpr, got %T", expr)
+	}
+	if bin.Op != token.NOTIN {
+		t.Errorf("op: got %v, want NOTIN", bin.Op)
+	}
+	list, ok := bin.Y.(*ast.ListExpr)
+	if !ok {
+		t.Fatalf("expected ListExpr, got %T", bin.Y)
+	}
+	if len(list.Elems) != 2 {
+		t.Errorf("list elems: got %d, want 2", len(list.Elems))
+	}
+}
+
+func TestParseNotInCIExpr(t *testing.T) {
+	src := `x !in~ ("a", "b")`
+	p := New("test", src)
+	expr := p.ParseExpr()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+	bin, ok := expr.(*ast.BinaryExpr)
+	if !ok {
+		t.Fatalf("expected BinaryExpr, got %T", expr)
+	}
+	if bin.Op != token.NOTINCI {
+		t.Errorf("op: got %v, want NOTINCI", bin.Op)
 	}
 }
 
