@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"strings"
+
 	"github.com/cloudygreybeard/kqlparser/ast"
 	"github.com/cloudygreybeard/kqlparser/token"
 )
@@ -143,6 +145,9 @@ func (p *Parser) parseSummarizeOp(pipePos token.Pos) *ast.SummarizeOp {
 
 	op := &ast.SummarizeOp{Pipe: pipePos, Summarize: summarizePos}
 
+	// Parse operator parameters (hints)
+	op.Params = p.parseOperatorParams()
+
 	// Parse aggregates (before 'by')
 	for p.tok != token.BY && p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
 		expr := p.parseNamedExprSingle()
@@ -167,7 +172,13 @@ func (p *Parser) parseSortOp(pipePos token.Pos) *ast.SortOp {
 	sortPos := p.pos
 	p.next() // consume 'sort' or 'order'
 
+	op := &ast.SortOp{Pipe: pipePos, Sort: sortPos}
+
+	// Parse operator parameters (hints)
+	op.Params = p.parseOperatorParams()
+
 	byPos := p.expect(token.BY)
+	op.ByPos = byPos
 
 	var orders []*ast.OrderExpr
 	for p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
@@ -196,7 +207,8 @@ func (p *Parser) parseSortOp(pipePos token.Pos) *ast.SortOp {
 		}
 	}
 
-	return &ast.SortOp{Pipe: pipePos, Sort: sortPos, ByPos: byPos, Orders: orders}
+	op.Orders = orders
+	return op
 }
 
 // parseTakeOp parses a take/limit operator.
@@ -256,6 +268,144 @@ func (p *Parser) parseDistinctOp(pipePos token.Pos) *ast.DistinctOp {
 	return &ast.DistinctOp{Pipe: pipePos, Distinct: distinctPos, Columns: columns}
 }
 
+// parseOperatorParams parses operator parameters like kind=inner, hint.strategy=broadcast.
+// Parameters have the form: name[.subname]* = value
+// Returns when a non-parameter token is encountered.
+func (p *Parser) parseOperatorParams() []*ast.OperatorParam {
+	var params []*ast.OperatorParam
+
+	for {
+		// Check if this looks like a parameter (identifier or keyword followed by = or .)
+		if p.tok != token.IDENT && p.tok != token.KIND && !p.tok.IsKeyword() {
+			break
+		}
+
+		// Look ahead to see if this is a parameter (name = value or name.subname = value)
+		if !p.isOperatorParam() {
+			break
+		}
+
+		// Parse parameter name (possibly dotted like hint.strategy)
+		name := p.parseIdent()
+
+		// Handle dotted names (e.g., hint.strategy)
+		for p.tok == token.DOT {
+			p.next() // consume '.'
+			suffix := p.parseIdent()
+			name = &ast.Ident{
+				NamePos: name.NamePos,
+				Name:    name.Name + "." + suffix.Name,
+			}
+		}
+
+		// Expect '='
+		assignPos := p.expect(token.ASSIGN)
+
+		// Parse parameter value (identifier or literal)
+		var value ast.Expr
+		switch p.tok {
+		case token.INT, token.REAL, token.STRING, token.BOOL:
+			value = p.parseLiteral()
+		default:
+			value = p.parseIdent()
+		}
+
+		params = append(params, &ast.OperatorParam{
+			Name:   name,
+			Assign: assignPos,
+			Value:  value,
+		})
+	}
+
+	return params
+}
+
+// isOperatorParam checks if the current position looks like an operator parameter.
+// Only returns true for known parameter patterns:
+// - kind=...
+// - hint.*=...
+// - withsource=..., isfuzzy=..., bagexpansion=..., decodeblocks=..., etc.
+func (p *Parser) isOperatorParam() bool {
+	// Check for keyword tokens that are known parameters
+	switch p.tok {
+	case token.KIND, token.WITHSOURCE:
+		// Check if followed by '='
+		savedOffset := p.lex.Offset()
+		savedPos := p.pos
+		savedTok := p.tok
+		savedLit := p.lit
+
+		p.next()
+		isParam := p.tok == token.ASSIGN
+
+		// Restore state
+		p.lex.Reset(savedOffset)
+		p.pos = savedPos
+		p.tok = savedTok
+		p.lit = savedLit
+		return isParam
+	}
+
+	// For identifiers, check if it's a known parameter pattern
+	if p.tok == token.IDENT {
+		name := strings.ToLower(p.lit)
+
+		// Check for hint.* pattern
+		if name == "hint" {
+			// Save state and check for dot
+			savedOffset := p.lex.Offset()
+			savedPos := p.pos
+			savedTok := p.tok
+			savedLit := p.lit
+
+			p.next()
+			if p.tok == token.DOT {
+				p.next() // consume '.'
+				if p.tok == token.IDENT || p.tok.IsKeyword() {
+					p.next() // consume identifier
+					if p.tok == token.ASSIGN {
+						// Restore and return true
+						p.lex.Reset(savedOffset)
+						p.pos = savedPos
+						p.tok = savedTok
+						p.lit = savedLit
+						return true
+					}
+				}
+			}
+			// Restore state
+			p.lex.Reset(savedOffset)
+			p.pos = savedPos
+			p.tok = savedTok
+			p.lit = savedLit
+			return false
+		}
+
+		// Check for known simple parameter names (as identifiers)
+		switch name {
+		case "isfuzzy", "bagexpansion", "decodeblocks", "expandoutput",
+			"with_itemindex", "with_match_id", "with_step_name":
+			// Check if followed by '='
+			savedOffset := p.lex.Offset()
+			savedPos := p.pos
+			savedTok := p.tok
+			savedLit := p.lit
+
+			p.next()
+			isParam := p.tok == token.ASSIGN
+
+			// Restore state
+			p.lex.Reset(savedOffset)
+			p.pos = savedPos
+			p.tok = savedTok
+			p.lit = savedLit
+			return isParam
+		}
+	}
+
+	return false
+}
+
 // parseJoinOp parses a join operator.
 func (p *Parser) parseJoinOp(pipePos token.Pos) *ast.JoinOp {
 	joinPos := p.pos
@@ -263,12 +413,16 @@ func (p *Parser) parseJoinOp(pipePos token.Pos) *ast.JoinOp {
 
 	op := &ast.JoinOp{Pipe: pipePos, Join: joinPos, Kind: ast.JoinInner}
 
-	// Check for kind parameter
-	if p.tok == token.KIND {
-		p.next()
-		p.expect(token.ASSIGN)
-		kind := p.parseIdent()
-		op.Kind = parseJoinKind(kind.Name)
+	// Parse operator parameters (kind, hints, etc.)
+	op.Params = p.parseOperatorParams()
+
+	// Extract kind from parameters
+	for _, param := range op.Params {
+		if param.Name.Name == "kind" {
+			if ident, ok := param.Value.(*ast.Ident); ok {
+				op.Kind = parseJoinKind(ident.Name)
+			}
+		}
 	}
 
 	// Parse right side
@@ -320,16 +474,21 @@ func (p *Parser) parseUnionOp(pipePos token.Pos) *ast.UnionOp {
 	unionPos := p.pos
 	p.next() // consume 'union'
 
-	var tables []ast.Expr
+	op := &ast.UnionOp{Pipe: pipePos, Union: unionPos}
+
+	// Parse operator parameters (kind, withsource, isfuzzy, etc.)
+	op.Params = p.parseOperatorParams()
+
+	// Parse tables
 	for p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
 		table := p.parseUnaryExpr()
-		tables = append(tables, table)
+		op.Tables = append(op.Tables, table)
 		if !p.accept(token.COMMA) {
 			break
 		}
 	}
 
-	return &ast.UnionOp{Pipe: pipePos, Union: unionPos, Tables: tables}
+	return op
 }
 
 // parseRenderOp parses a render operator.

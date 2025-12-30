@@ -4,6 +4,16 @@ import (
 	"github.com/cloudygreybeard/kqlparser/token"
 )
 
+// OperatorParam represents a query operator parameter (e.g., hint.strategy=broadcast).
+type OperatorParam struct {
+	Name   *Ident    // Parameter name (e.g., "hint.strategy", "kind")
+	Assign token.Pos // Position of "="
+	Value  Expr      // Parameter value (identifier or literal)
+}
+
+func (x *OperatorParam) Pos() token.Pos { return x.Name.Pos() }
+func (x *OperatorParam) End() token.Pos { return x.Value.End() }
+
 // WhereOp represents a where operator (| where <predicate>).
 type WhereOp struct {
 	Pipe      token.Pos // Position of "|"
@@ -64,11 +74,12 @@ func (x *ExtendOp) End() token.Pos {
 
 // SummarizeOp represents a summarize operator.
 type SummarizeOp struct {
-	Pipe       token.Pos    // Position of "|"
-	Summarize  token.Pos    // Position of "summarize"
-	Aggregates []*NamedExpr // Aggregate expressions
-	ByPos      token.Pos    // Position of "by" (NoPos if no by clause)
-	GroupBy    []*NamedExpr // Group by expressions
+	Pipe       token.Pos        // Position of "|"
+	Summarize  token.Pos        // Position of "summarize"
+	Params     []*OperatorParam // Operator parameters (hints, etc.)
+	Aggregates []*NamedExpr     // Aggregate expressions
+	ByPos      token.Pos        // Position of "by" (NoPos if no by clause)
+	GroupBy    []*NamedExpr     // Group by expressions
 }
 
 func (x *SummarizeOp) Pos() token.Pos { return x.Pipe }
@@ -85,10 +96,11 @@ func (x *SummarizeOp) End() token.Pos {
 
 // SortOp represents a sort/order operator.
 type SortOp struct {
-	Pipe   token.Pos    // Position of "|"
-	Sort   token.Pos    // Position of "sort" or "order"
-	ByPos  token.Pos    // Position of "by"
-	Orders []*OrderExpr // Ordered expressions
+	Pipe   token.Pos        // Position of "|"
+	Sort   token.Pos        // Position of "sort" or "order"
+	Params []*OperatorParam // Operator parameters (hints, etc.)
+	ByPos  token.Pos        // Position of "by"
+	Orders []*OrderExpr     // Ordered expressions
 }
 
 func (x *SortOp) Pos() token.Pos { return x.Pipe }
@@ -173,12 +185,13 @@ const (
 
 // JoinOp represents a join operator.
 type JoinOp struct {
-	Pipe   token.Pos // Position of "|"
-	Join   token.Pos // Position of "join"
-	Kind   JoinKind  // Join kind
-	Right  Expr      // Right side expression
-	OnPos  token.Pos // Position of "on"
-	OnExpr []Expr    // Join conditions
+	Pipe   token.Pos        // Position of "|"
+	Join   token.Pos        // Position of "join"
+	Params []*OperatorParam // Operator parameters (kind, hints, etc.)
+	Kind   JoinKind         // Join kind (derived from kind parameter)
+	Right  Expr             // Right side expression
+	OnPos  token.Pos        // Position of "on"
+	OnExpr []Expr           // Join conditions
 }
 
 func (x *JoinOp) Pos() token.Pos { return x.Pipe }
@@ -192,9 +205,10 @@ func (x *JoinOp) End() token.Pos {
 
 // UnionOp represents a union operator.
 type UnionOp struct {
-	Pipe   token.Pos // Position of "|"
-	Union  token.Pos // Position of "union"
-	Tables []Expr    // Tables to union
+	Pipe   token.Pos        // Position of "|"
+	Union  token.Pos        // Position of "union"
+	Params []*OperatorParam // Operator parameters (kind, withsource, etc.)
+	Tables []Expr           // Tables to union
 }
 
 func (x *UnionOp) Pos() token.Pos { return x.Pipe }

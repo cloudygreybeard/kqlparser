@@ -83,6 +83,25 @@ func (l *Lexer) File() *token.File {
 	return l.file
 }
 
+// Offset returns the current byte offset in the source.
+func (l *Lexer) Offset() int {
+	return l.offset
+}
+
+// Reset resets the lexer to the given byte offset.
+// This is used for lookahead operations.
+func (l *Lexer) Reset(offset int) {
+	l.offset = offset
+	l.rdOffset = offset
+	if offset < len(l.src) {
+		r, w := utf8.DecodeRuneInString(l.src[offset:])
+		l.ch = r
+		l.rdOffset = offset + w
+	} else {
+		l.ch = -1 // EOF
+	}
+}
+
 const eof = -1
 
 // next reads the next Unicode character into l.ch.
