@@ -1152,23 +1152,46 @@ func (p *Parser) parseConsumeOp(pipePos token.Pos) *ast.ConsumeOp {
 }
 
 // parseEvaluateOp parses an evaluate operator.
+// Syntax: evaluate [params] plugin(...) [: (schema)]
 func (p *Parser) parseEvaluateOp(pipePos token.Pos) *ast.EvaluateOp {
 	opPos := p.pos
 	p.next() // consume 'evaluate'
 
+	op := &ast.EvaluateOp{Pipe: pipePos, Evaluate: opPos}
+
+	// Parse optional parameters (e.g., hint.distribution=...)
+	op.Params = p.parseOperatorParams()
+
+	// Parse plugin call
 	expr := p.parsePostfixExpr()
-	var plugin *ast.CallExpr
 	if call, ok := expr.(*ast.CallExpr); ok {
-		plugin = call
+		op.Plugin = call
 	} else {
-		plugin = &ast.CallExpr{Fun: expr, Lparen: expr.Pos(), Rparen: expr.End()}
+		op.Plugin = &ast.CallExpr{Fun: expr, Lparen: expr.Pos(), Rparen: expr.End()}
 	}
 
-	return &ast.EvaluateOp{
-		Pipe:     pipePos,
-		Evaluate: opPos,
-		Plugin:   plugin,
+	// Parse optional schema clause: : (col:type, ...)
+	if p.tok == token.COLON {
+		p.next() // consume ':'
+		if p.tok == token.LPAREN {
+			p.next() // consume '('
+			for p.tok != token.RPAREN && p.tok != token.EOF {
+				col := &ast.ColumnDeclExpr{Name: p.parseIdent()}
+				if p.tok == token.COLON {
+					col.Colon = p.pos
+					p.next()
+					col.Type = p.parseIdent()
+				}
+				op.Schema = append(op.Schema, col)
+				if !p.accept(token.COMMA) {
+					break
+				}
+			}
+			p.expect(token.RPAREN)
+		}
 	}
+
+	return op
 }
 
 // parseReduceOp parses a reduce operator.
@@ -1188,21 +1211,49 @@ func (p *Parser) parseReduceOp(pipePos token.Pos) *ast.ReduceOp {
 }
 
 // parseForkOp parses a fork operator.
+// Syntax: fork [name=(query)] [name=(query)] ...
 func (p *Parser) parseForkOp(pipePos token.Pos) *ast.ForkOp {
 	opPos := p.pos
 	p.next() // consume 'fork'
 
 	op := &ast.ForkOp{Pipe: pipePos, Fork: opPos}
 
-	// Parse prongs (simplified - fork has complex syntax)
-	for p.tok == token.LPAREN {
-		prong := &ast.ForkProng{Lparen: p.pos}
-		p.next() // consume '('
-		// Parse inner query as expression (simplified)
-		expr := p.parseExpr()
-		if pipe, ok := expr.(*ast.PipeExpr); ok {
-			prong.Query = pipe
+	// Parse prongs: either (query) or name=(query)
+	for p.tok == token.LPAREN || p.tok == token.IDENT || p.tok.IsKeyword() {
+		prong := &ast.ForkProng{}
+
+		// Check for optional name=
+		if p.tok == token.IDENT || p.tok.IsKeyword() {
+			// Save position to check for '='
+			savedOffset := p.lex.Offset()
+			savedPos := p.pos
+			savedTok := p.tok
+			savedLit := p.lit
+
+			name := p.parseIdent()
+			if p.tok == token.ASSIGN {
+				p.next() // consume '='
+				prong.Name = name
+			} else {
+				// Not a named fork, restore state
+				p.lex.Reset(savedOffset)
+				p.pos = savedPos
+				p.tok = savedTok
+				p.lit = savedLit
+				break
+			}
 		}
+
+		// Expect '('
+		if p.tok != token.LPAREN {
+			break
+		}
+		prong.Lparen = p.pos
+		p.next() // consume '('
+
+		// Parse inner query
+		prong.Query = p.parseContextualSubExpr()
+
 		prong.Rparen = p.expect(token.RPAREN)
 		op.Prongs = append(op.Prongs, prong)
 	}
@@ -1212,6 +1263,7 @@ func (p *Parser) parseForkOp(pipePos token.Pos) *ast.ForkOp {
 }
 
 // parseFacetOp parses a facet operator.
+// Syntax: facet by col1, col2 [with Operator | with (query)]
 func (p *Parser) parseFacetOp(pipePos token.Pos) *ast.FacetOp {
 	opPos := p.pos
 	p.next() // consume 'facet'
@@ -1231,9 +1283,18 @@ func (p *Parser) parseFacetOp(pipePos token.Pos) *ast.FacetOp {
 	if p.tok == token.WITH {
 		op.With = p.pos
 		p.next()
-		expr := p.parseExpr()
-		if pipe, ok := expr.(*ast.PipeExpr); ok {
-			op.Query = pipe
+
+		// Two forms: with (query) or with Operator
+		if p.tok == token.LPAREN {
+			p.next() // consume '('
+			op.Query = p.parseContextualSubExpr()
+			p.expect(token.RPAREN)
+		} else {
+			// Parse as a direct operator expression
+			expr := p.parseExpr()
+			if pipe, ok := expr.(*ast.PipeExpr); ok {
+				op.Query = pipe
+			}
 		}
 	}
 

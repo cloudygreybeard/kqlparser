@@ -596,13 +596,20 @@ func (x *ScanOp) End() token.Pos { return x.EndPos }
 
 // EvaluateOp represents an evaluate operator (plugin invocation).
 type EvaluateOp struct {
-	Pipe     token.Pos // Position of "|"
-	Evaluate token.Pos // Position of "evaluate"
-	Plugin   *CallExpr // Plugin call
+	Pipe     token.Pos         // Position of "|"
+	Evaluate token.Pos         // Position of "evaluate"
+	Params   []*OperatorParam  // Optional parameters (e.g., hint.distribution=...)
+	Plugin   *CallExpr         // Plugin call
+	Schema   []*ColumnDeclExpr // Optional result schema (: (col:type, ...))
 }
 
 func (x *EvaluateOp) Pos() token.Pos { return x.Pipe }
-func (x *EvaluateOp) End() token.Pos { return x.Plugin.End() }
+func (x *EvaluateOp) End() token.Pos {
+	if len(x.Schema) > 0 {
+		return x.Schema[len(x.Schema)-1].End()
+	}
+	return x.Plugin.End()
+}
 
 // ReduceOp represents a reduce operator.
 type ReduceOp struct {
@@ -1121,11 +1128,11 @@ func (x *ExecuteAndCacheOp) End() token.Pos { return x.ExecuteAndCache + 17 } //
 
 // AssertSchemaOp represents an assert-schema operator.
 type AssertSchemaOp struct {
-	Pipe         token.Pos // Position of "|"
-	AssertSchema token.Pos // Position of "assert-schema"
-	Lparen       token.Pos // Position of "("
+	Pipe         token.Pos         // Position of "|"
+	AssertSchema token.Pos         // Position of "assert-schema"
+	Lparen       token.Pos         // Position of "("
 	Columns      []*ColumnDeclExpr // Schema columns
-	Rparen       token.Pos // Position of ")"
+	Rparen       token.Pos         // Position of ")"
 }
 
 func (x *AssertSchemaOp) Pos() token.Pos { return x.Pipe }
