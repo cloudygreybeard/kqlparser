@@ -501,6 +501,49 @@ func TestASTPrint(t *testing.T) {
 	}
 }
 
+func TestParseOpWithTypes(t *testing.T) {
+	src := `T | parse Text with Key:string "=" Value:long`
+	p := New("test", src)
+	expr := p.ParseExpr()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+	pipe, ok := expr.(*ast.PipeExpr)
+	if !ok {
+		t.Fatalf("expected PipeExpr, got %T", expr)
+	}
+	parseOp, ok := pipe.Operators[0].(*ast.ParseOp)
+	if !ok {
+		t.Fatalf("expected ParseOp, got %T", pipe.Operators[0])
+	}
+
+	// Check leading column
+	if parseOp.LeadingCol == nil {
+		t.Fatal("expected leading column")
+	}
+	if parseOp.LeadingCol.Name.Name != "Key" {
+		t.Errorf("leading col name: got %q, want Key", parseOp.LeadingCol.Name.Name)
+	}
+	if parseOp.LeadingCol.Type == nil || parseOp.LeadingCol.Type.Name != "string" {
+		t.Errorf("leading col type: got %v, want string", parseOp.LeadingCol.Type)
+	}
+
+	// Check segment
+	if len(parseOp.Segments) != 1 {
+		t.Fatalf("segment count: got %d, want 1", len(parseOp.Segments))
+	}
+	seg := parseOp.Segments[0]
+	if seg.Column == nil {
+		t.Fatal("expected segment column")
+	}
+	if seg.Column.Name.Name != "Value" {
+		t.Errorf("segment col name: got %q, want Value", seg.Column.Name.Name)
+	}
+	if seg.Column.Type == nil || seg.Column.Type.Name != "long" {
+		t.Errorf("segment col type: got %v, want long", seg.Column.Type)
+	}
+}
+
 func TestNewOperators(t *testing.T) {
 	tests := []struct {
 		name string
@@ -517,6 +560,7 @@ func TestNewOperators(t *testing.T) {
 		{"externaldata", "externaldata(x:string) ['https://example.com/data.csv']"},
 		{"parse-where", "T | parse-where Message '*error*'"},
 		{"parse-kv", "T | parse-kv Data as (key1, key2)"},
+		{"parse-with-types", "T | parse Text with Key:string \"=\" Value:long"},
 	}
 
 	for _, tt := range tests {

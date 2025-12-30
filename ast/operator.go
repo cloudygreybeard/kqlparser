@@ -217,17 +217,58 @@ type RenderOp struct {
 func (x *RenderOp) Pos() token.Pos { return x.Pipe }
 func (x *RenderOp) End() token.Pos { return x.ChartType.End() }
 
+// ParseColumn represents a column capture in a parse pattern (e.g., Key:string).
+type ParseColumn struct {
+	Name *Ident    // Column name
+	Type *Ident    // Optional type annotation (e.g., "string", "long")
+}
+
+func (x *ParseColumn) Pos() token.Pos { return x.Name.Pos() }
+func (x *ParseColumn) End() token.Pos {
+	if x.Type != nil {
+		return x.Type.End()
+	}
+	return x.Name.End()
+}
+func (x *ParseColumn) expr() {}
+
+// ParsePatternSegment represents a segment in a parse pattern.
+type ParsePatternSegment struct {
+	Star   bool        // Whether preceded by *
+	Text   Expr        // String literal delimiter
+	Column *ParseColumn // Optional column capture after delimiter
+}
+
 // ParseOp represents a parse operator.
 type ParseOp struct {
-	Pipe    token.Pos // Position of "|"
-	Parse   token.Pos // Position of "parse"
-	Source  Expr      // Source expression to parse
-	WithPos token.Pos // Position of "with"
-	Pattern Expr      // Parse pattern
+	Pipe         token.Pos             // Position of "|"
+	Parse        token.Pos             // Position of "parse"
+	Kind         string                // Parse kind: "", "simple", "regex", "relaxed"
+	Source       Expr                  // Source expression to parse
+	WithPos      token.Pos             // Position of "with"
+	LeadingCol   *ParseColumn          // Optional leading column before any delimiter
+	Segments     []*ParsePatternSegment // Pattern segments
+	TrailingStar bool                  // Whether pattern ends with *
+	Pattern      Expr                  // Legacy: simple parse pattern (for backward compat)
 }
 
 func (x *ParseOp) Pos() token.Pos { return x.Pipe }
-func (x *ParseOp) End() token.Pos { return x.Pattern.End() }
+func (x *ParseOp) End() token.Pos {
+	if len(x.Segments) > 0 {
+		lastSeg := x.Segments[len(x.Segments)-1]
+		if lastSeg.Column != nil {
+			return lastSeg.Column.End()
+		}
+		return lastSeg.Text.End()
+	}
+	if x.LeadingCol != nil {
+		return x.LeadingCol.End()
+	}
+	if x.Pattern != nil {
+		return x.Pattern.End()
+	}
+	return x.WithPos
+}
 
 // ParseWhereOp represents a parse-where operator.
 type ParseWhereOp struct {

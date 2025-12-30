@@ -155,7 +155,7 @@ func TestSpecificGrammarPatterns(t *testing.T) {
 		{"timespan_minutes", "print 5min", false},
 		{"timespan_hours", "print 2hr", false},
 		{"string_verbatim", `print @"no\escape"`, false},
-		{"string_multiline", "print ```multi\nline```", true}, // TODO: not yet supported
+		{"string_multiline", "print ```multi\nline```", true},                      // TODO: not yet supported
 		{"guid_literal", "print guid(12345678-1234-1234-1234-123456789abc)", true}, // TODO: not yet supported
 
 		// Operators
@@ -186,7 +186,7 @@ func TestSpecificGrammarPatterns(t *testing.T) {
 
 		// Statements
 		{"let_simple", "let x = 5", false},
-		{"let_function", "let f = (a: int) { a * 2 }", true}, // TODO: typed params not supported
+		{"let_function", "let f = (a: int) { a * 2 }", true},    // TODO: typed params not supported
 		{"let_tabular", "let f = (T: (*)) { T | count }", true}, // TODO: tabular params not supported
 		{"set_option", "set notruncation", false},
 		{"declare_params", "declare query_parameters(x: int)", true}, // TODO: not supported
@@ -368,4 +368,3 @@ func TestOperatorKeywords(t *testing.T) {
 		})
 	}
 }
-

@@ -103,6 +103,15 @@ T | where Text endswith_cs "End"
 
 T | where Text !endswith_cs "End"
 
+// String Operators - like
+T | where Name like "pattern*"
+
+T | where Name notlike "bad*"
+
+T | where Name likecs "Pattern*"
+
+T | where Name notlikecs "Bad*"
+
 // String Operators - matches regex
 T | where Text matches regex "^[a-z]+$"
 

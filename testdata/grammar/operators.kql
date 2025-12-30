@@ -45,6 +45,10 @@ T1 | join T2 on Key
 
 T1 | join kind=inner T2 on Key
 
+T1 | join T2 on $left.id == $right.id
+
+T1 | join kind=leftouter T2 on $left.a == $right.a, $left.b == $right.b
+
 // lookup
 T1 | lookup T2 on Key
 
@@ -62,6 +66,10 @@ T | mv-expand Col1, Col2
 T | parse Text with * "key=" Key
 
 T | parse Text with "start" Middle "end"
+
+T | parse Text with Key:string "=" Value:long
+
+T | parse kind=regex Text with * "pattern" Col:int
 
 // parse-kv
 T | parse-kv Text as (Key1, Key2)

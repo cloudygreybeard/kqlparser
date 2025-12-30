@@ -345,16 +345,97 @@ func (p *Parser) parseRenderOp(pipePos token.Pos) *ast.RenderOp {
 }
 
 // parseParseOp parses a parse operator.
+// Syntax: parse [kind=simple|regex|relaxed] Source with Pattern
+// Pattern: [LeadingColumn] (["*"] StringLiteral [Column])* ["*"]
+// Column: Name[:Type]
 func (p *Parser) parseParseOp(pipePos token.Pos) *ast.ParseOp {
 	parsePos := p.pos
 	p.next() // consume 'parse'
 
-	source := p.parseExpr()
+	op := &ast.ParseOp{Pipe: pipePos, Parse: parsePos}
 
-	withPos := p.expect(token.WITH)
-	pattern := p.parsePrimaryExpr() // Usually a string with parse pattern
+	// Check for kind clause
+	if p.tok == token.KIND {
+		p.next()
+		p.expect(token.ASSIGN)
+		kind := p.parseIdent()
+		op.Kind = kind.Name
+	}
 
-	return &ast.ParseOp{Pipe: pipePos, Parse: parsePos, Source: source, WithPos: withPos, Pattern: pattern}
+	// Parse source expression
+	op.Source = p.parseUnaryExpr()
+
+	// Expect 'with'
+	op.WithPos = p.expect(token.WITH)
+
+	// Parse pattern - can be:
+	// 1. Simple string literal (legacy)
+	// 2. Complex pattern with column captures and type annotations
+
+	// Check if first token is an identifier (leading column)
+	if p.tok == token.IDENT {
+		op.LeadingCol = p.parseParseColumn()
+	}
+
+	// Parse segments: ["*"] StringLiteral [Column]
+	for p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
+		seg := &ast.ParsePatternSegment{}
+
+		// Check for leading star
+		if p.tok == token.MUL {
+			seg.Star = true
+			p.next()
+		}
+
+		// Check for trailing star (end of pattern)
+		if p.tok == token.PIPE || p.tok == token.EOF || p.tok == token.SEMI {
+			if seg.Star {
+				op.TrailingStar = true
+			}
+			break
+		}
+
+		// Expect string literal delimiter
+		if p.tok == token.STRING {
+			seg.Text = &ast.BasicLit{
+				ValuePos: p.pos,
+				Kind:     p.tok,
+				Value:    p.lit,
+			}
+			p.next()
+
+			// Check for column after delimiter
+			if p.tok == token.IDENT {
+				seg.Column = p.parseParseColumn()
+			}
+
+			op.Segments = append(op.Segments, seg)
+		} else if seg.Star {
+			// Star without following string - trailing star
+			op.TrailingStar = true
+			break
+		} else {
+			// Unexpected token
+			break
+		}
+	}
+
+	return op
+}
+
+// parseParseColumn parses a column capture: Name[:Type]
+func (p *Parser) parseParseColumn() *ast.ParseColumn {
+	col := &ast.ParseColumn{
+		Name: p.parseIdent(),
+	}
+
+	// Check for type annotation
+	if p.tok == token.COLON {
+		p.next()
+		col.Type = p.parseIdent()
+	}
+
+	return col
 }
 
 // parseMvExpandOp parses an mv-expand operator.
