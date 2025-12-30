@@ -211,27 +211,49 @@ func (l *Lexer) scanIdentifier(pos token.Pos) Token {
 	// Check for special keyword forms
 	tok := token.Lookup(lit)
 
-	// Handle keywords with hyphens (e.g., "make-series", "project-away")
-	if l.ch == '-' {
-		// Peek ahead to see if this could be a hyphenated keyword
-		combined := lit + "-"
+	// Handle keywords with hyphens (e.g., "make-series", "project-away", "graph-shortest-paths")
+	// Try extending with all possible hyphen-word combinations
+	if l.ch == '-' && isLetter(l.peek()) {
+		// Save state before trying hyphenated keywords
 		savedOffset := l.offset
 		savedRdOffset := l.rdOffset
 		savedCh := l.ch
-		l.next() // consume -
+		bestLit := lit
+		bestTok := tok
+		bestOffset := l.offset
+		bestRdOffset := l.rdOffset
+		bestCh := l.ch
 
-		// Scan the rest
-		wordStart := l.offset
-		for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
-			l.next()
-		}
-		if l.offset > wordStart {
+		// Greedily scan all hyphen-word combinations
+		combined := lit
+		for l.ch == '-' && isLetter(l.peek()) {
+			l.next() // consume -
+			combined += "-"
+			wordStart := l.offset
+			for isLetter(l.ch) || isDigit(l.ch) || l.ch == '_' {
+				l.next()
+			}
 			combined += l.src[wordStart:l.offset]
+
+			// Check if this is a valid keyword
 			if kwTok := token.Lookup(combined); kwTok != token.IDENT {
-				return Token{Type: kwTok, Pos: pos, Lit: combined}
+				bestLit = combined
+				bestTok = kwTok
+				bestOffset = l.offset
+				bestRdOffset = l.rdOffset
+				bestCh = l.ch
 			}
 		}
-		// Not a hyphenated keyword, restore state
+
+		// If we found a valid hyphenated keyword, use it
+		if bestTok != token.IDENT {
+			l.offset = bestOffset
+			l.rdOffset = bestRdOffset
+			l.ch = bestCh
+			return Token{Type: bestTok, Pos: pos, Lit: bestLit}
+		}
+
+		// Restore to original position
 		l.offset = savedOffset
 		l.rdOffset = savedRdOffset
 		l.ch = savedCh
@@ -466,6 +488,18 @@ func (l *Lexer) scanOperator(pos token.Pos) Token {
 	case '+':
 		return Token{Type: token.ADD, Pos: pos, Lit: "+"}
 	case '-':
+		switch l.ch {
+		case '-':
+			l.next() // consume second -
+			if l.ch == '>' {
+				l.next()
+				return Token{Type: token.DASHGT, Pos: pos, Lit: "-->"}
+			}
+			return Token{Type: token.DASHDASH, Pos: pos, Lit: "--"}
+		case '[':
+			l.next()
+			return Token{Type: token.DASHLBRACK, Pos: pos, Lit: "-["}
+		}
 		return Token{Type: token.SUB, Pos: pos, Lit: "-"}
 	case '*':
 		return Token{Type: token.MUL, Pos: pos, Lit: "*"}
@@ -488,6 +522,14 @@ func (l *Lexer) scanOperator(pos token.Pos) Token {
 	case '[':
 		return Token{Type: token.LBRACKET, Pos: pos, Lit: "["}
 	case ']':
+		if l.ch == '-' {
+			l.next() // consume -
+			if l.ch == '>' {
+				l.next()
+				return Token{Type: token.RBRACKDASHGT, Pos: pos, Lit: "]->"}
+			}
+			return Token{Type: token.RBRACKDASH, Pos: pos, Lit: "]-"}
+		}
 		return Token{Type: token.RBRACKET, Pos: pos, Lit: "]"}
 	case '{':
 		return Token{Type: token.LBRACE, Pos: pos, Lit: "{"}
@@ -535,6 +577,20 @@ func (l *Lexer) scanOperator(pos token.Pos) Token {
 		case '>':
 			l.next()
 			return Token{Type: token.NEQ, Pos: pos, Lit: "<>"}
+		case '-':
+			l.next() // consume -
+			switch l.ch {
+			case '-':
+				l.next()
+				return Token{Type: token.LTDASH, Pos: pos, Lit: "<--"}
+			case '[':
+				l.next()
+				return Token{Type: token.LTDASHLBRACK, Pos: pos, Lit: "<-["}
+			}
+			// Just <-, not valid on its own, return as separate tokens
+			// Push back the - by treating this as an error case
+			l.error(l.offset, "unexpected '<-'")
+			return Token{Type: token.ILLEGAL, Pos: pos, Lit: "<-"}
 		}
 		return Token{Type: token.LSS, Pos: pos, Lit: "<"}
 	case '>':
@@ -648,3 +704,4 @@ func isDigit(ch rune) bool {
 func isHexDigit(ch rune) bool {
 	return isDigit(ch) || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
 }
+

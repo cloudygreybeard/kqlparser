@@ -91,6 +91,20 @@ func (p *Parser) parseOperator() ast.Operator {
 		return p.parseMvApplyOp(pipePos)
 	case token.FIND:
 		return p.parseFindOp(pipePos)
+	case token.MAKEGRAPH:
+		return p.parseMakeGraphOp(pipePos)
+	case token.GRAPHMATCH:
+		return p.parseGraphMatchOp(pipePos)
+	case token.GRAPHSHORTESTPATHS:
+		return p.parseGraphShortestPathsOp(pipePos)
+	case token.GRAPHMARKCOMPONENTS:
+		return p.parseGraphMarkComponentsOp(pipePos)
+	case token.GRAPHTOTABLE:
+		return p.parseGraphToTableOp(pipePos)
+	case token.GRAPHWHERENODES:
+		return p.parseGraphWhereNodesOp(pipePos)
+	case token.GRAPHWHEREEDGES:
+		return p.parseGraphWhereEdgesOp(pipePos)
 	default:
 		return p.parseGenericOp(pipePos)
 	}
@@ -181,6 +195,20 @@ func (p *Parser) parseOperatorDirect() ast.Operator {
 		return p.parseMvApplyOp(pipePos)
 	case token.FIND:
 		return p.parseFindOp(pipePos)
+	case token.MAKEGRAPH:
+		return p.parseMakeGraphOp(pipePos)
+	case token.GRAPHMATCH:
+		return p.parseGraphMatchOp(pipePos)
+	case token.GRAPHSHORTESTPATHS:
+		return p.parseGraphShortestPathsOp(pipePos)
+	case token.GRAPHMARKCOMPONENTS:
+		return p.parseGraphMarkComponentsOp(pipePos)
+	case token.GRAPHTOTABLE:
+		return p.parseGraphToTableOp(pipePos)
+	case token.GRAPHWHERENODES:
+		return p.parseGraphWhereNodesOp(pipePos)
+	case token.GRAPHWHEREEDGES:
+		return p.parseGraphWhereEdgesOp(pipePos)
 	default:
 		// Fall back to parsing as an expression (for simple expr-based subqueries)
 		return nil
@@ -475,7 +503,8 @@ func (p *Parser) isOperatorParam() bool {
 		// Check for known simple parameter names (as identifiers)
 		switch name {
 		case "isfuzzy", "bagexpansion", "decodeblocks", "expandoutput",
-			"with_itemindex", "with_match_id", "with_step_name":
+			"with_itemindex", "with_match_id", "with_step_name",
+			"with_component_id", "with_node_id":
 			// Check if followed by '='
 			savedOffset := p.lex.Offset()
 			savedPos := p.pos
@@ -1546,4 +1575,362 @@ func (p *Parser) parseParseKvOp(pipePos token.Pos) *ast.ParseKvOp {
 	}
 
 	return op
+}
+
+// ============================================================================
+// Graph Operators
+// ============================================================================
+
+// parseMakeGraphOp parses a make-graph operator.
+// Syntax: make-graph SourceColumn --> TargetColumn [with ...] 
+func (p *Parser) parseMakeGraphOp(pipePos token.Pos) *ast.MakeGraphOp {
+	opPos := p.pos
+	p.next() // consume 'make-graph'
+
+	op := &ast.MakeGraphOp{Pipe: pipePos, MakeGraph: opPos}
+
+	// Parse optional parameters
+	op.Params = p.parseOperatorParams()
+
+	// Parse source column
+	op.SourceColumn = p.parseExprNoPipe()
+
+	// Parse direction: --> or --
+	if p.tok == token.DASHGT {
+		op.Direction = p.pos
+		op.Directed = true
+		p.next()
+	} else if p.tok == token.DASHDASH {
+		op.Direction = p.pos
+		op.Directed = false
+		p.next()
+	} else {
+		p.error(p.pos, "expected --> or --")
+	}
+
+	// Parse target column
+	op.TargetColumn = p.parseExprNoPipe()
+
+	// Parse optional with clause
+	if p.tok == token.WITH {
+		withPos := p.pos
+		p.next()
+		
+		op.WithClause = &ast.MakeGraphWith{WithPos: withPos}
+		
+		// Check for with_node_id = name
+		if p.tok == token.WITHNODEID || (p.tok == token.IDENT && p.lit == "with_node_id") {
+			p.next()
+			p.expect(token.ASSIGN)
+			op.WithClause.NodeId = p.parseIdent()
+		} else {
+			// with Table on Column
+			op.WithClause.Table = p.parseExprNoPipe()
+			if p.tok == token.ON {
+				op.WithClause.OnPos = p.pos
+				p.next()
+				op.WithClause.OnCol = p.parseExprNoPipe()
+			}
+		}
+	}
+
+	return op
+}
+
+// parseGraphMatchOp parses a graph-match operator.
+// Syntax: graph-match (a)-[e]->(b) [where ...] [project ...]
+func (p *Parser) parseGraphMatchOp(pipePos token.Pos) *ast.GraphMatchOp {
+	opPos := p.pos
+	p.next() // consume 'graph-match'
+
+	op := &ast.GraphMatchOp{Pipe: pipePos, GraphMatch: opPos}
+
+	// Parse optional parameters
+	op.Params = p.parseOperatorParams()
+
+	// Parse patterns
+	op.Patterns = p.parseGraphPatterns()
+
+	// Parse optional where clause
+	if p.tok == token.WHERE {
+		op.Where = p.parseWhereClause()
+	}
+
+	// Parse optional project clause
+	if p.tok == token.PROJECT {
+		op.Project = p.parseProjectClause()
+	}
+
+	return op
+}
+
+// parseGraphShortestPathsOp parses a graph-shortest-paths operator.
+func (p *Parser) parseGraphShortestPathsOp(pipePos token.Pos) *ast.GraphShortestPathsOp {
+	opPos := p.pos
+	p.next() // consume 'graph-shortest-paths'
+
+	op := &ast.GraphShortestPathsOp{Pipe: pipePos, GraphShortestPath: opPos}
+
+	// Parse optional parameters
+	op.Params = p.parseOperatorParams()
+
+	// Parse patterns
+	op.Patterns = p.parseGraphPatterns()
+
+	// Parse optional where clause
+	if p.tok == token.WHERE {
+		op.Where = p.parseWhereClause()
+	}
+
+	// Parse optional project clause
+	if p.tok == token.PROJECT {
+		op.Project = p.parseProjectClause()
+	}
+
+	return op
+}
+
+// parseGraphMarkComponentsOp parses a graph-mark-components operator.
+func (p *Parser) parseGraphMarkComponentsOp(pipePos token.Pos) *ast.GraphMarkComponentsOp {
+	opPos := p.pos
+	p.next() // consume 'graph-mark-components'
+
+	op := &ast.GraphMarkComponentsOp{Pipe: pipePos, GraphMarkComponents: opPos}
+
+	// Parse optional parameters
+	op.Params = p.parseOperatorParams()
+
+	return op
+}
+
+// parseGraphToTableOp parses a graph-to-table operator.
+// Syntax: graph-to-table nodes [as Name], edges [as Name]
+func (p *Parser) parseGraphToTableOp(pipePos token.Pos) *ast.GraphToTableOp {
+	opPos := p.pos
+	p.next() // consume 'graph-to-table'
+
+	op := &ast.GraphToTableOp{Pipe: pipePos, GraphToTable: opPos}
+
+	// Parse output clauses
+	for p.tok == token.NODES || p.tok == token.EDGES {
+		output := &ast.GraphToTableOutput{Keyword: p.pos}
+		output.IsNodes = p.tok == token.NODES
+		p.next()
+
+		// Parse optional 'as Name'
+		if p.tok == token.AS {
+			p.next()
+			output.AsName = p.parseIdent()
+		}
+
+		// Parse optional parameters
+		output.Params = p.parseOperatorParams()
+
+		op.Outputs = append(op.Outputs, output)
+
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	return op
+}
+
+// parseGraphWhereNodesOp parses a graph-where-nodes operator.
+func (p *Parser) parseGraphWhereNodesOp(pipePos token.Pos) *ast.GraphWhereNodesOp {
+	opPos := p.pos
+	p.next() // consume 'graph-where-nodes'
+
+	return &ast.GraphWhereNodesOp{
+		Pipe:            pipePos,
+		GraphWhereNodes: opPos,
+		Predicate:       p.parseExprNoPipe(),
+	}
+}
+
+// parseGraphWhereEdgesOp parses a graph-where-edges operator.
+func (p *Parser) parseGraphWhereEdgesOp(pipePos token.Pos) *ast.GraphWhereEdgesOp {
+	opPos := p.pos
+	p.next() // consume 'graph-where-edges'
+
+	return &ast.GraphWhereEdgesOp{
+		Pipe:            pipePos,
+		GraphWhereEdges: opPos,
+		Predicate:       p.parseExprNoPipe(),
+	}
+}
+
+// parseGraphPatterns parses a list of graph match patterns.
+func (p *Parser) parseGraphPatterns() []*ast.GraphMatchPattern {
+	var patterns []*ast.GraphMatchPattern
+
+	for {
+		pattern := p.parseGraphPattern()
+		if pattern != nil && len(pattern.Elements) > 0 {
+			patterns = append(patterns, pattern)
+		} else {
+			break
+		}
+
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	return patterns
+}
+
+// parseGraphPattern parses a single graph pattern like (a)-[e]->(b).
+func (p *Parser) parseGraphPattern() *ast.GraphMatchPattern {
+	pattern := &ast.GraphMatchPattern{}
+
+	for {
+		switch p.tok {
+		case token.LPAREN:
+			// Node: (name)
+			node := &ast.GraphPatternNode{Lparen: p.pos}
+			p.next()
+			node.Name = p.parseIdent()
+			node.Rparen = p.pos
+			p.expect(token.RPAREN)
+			pattern.Elements = append(pattern.Elements, node)
+
+		case token.DASHDASH:
+			// Unnamed undirected edge: --
+			edge := &ast.GraphPatternEdge{Start: p.pos, Direction: 0}
+			p.next()
+			edge.End_ = p.pos - 1
+			pattern.Elements = append(pattern.Elements, edge)
+
+		case token.DASHGT:
+			// Unnamed forward edge: -->
+			edge := &ast.GraphPatternEdge{Start: p.pos, Direction: 1}
+			p.next()
+			edge.End_ = p.pos - 1
+			pattern.Elements = append(pattern.Elements, edge)
+
+		case token.LTDASH:
+			// Unnamed backward edge: <--
+			edge := &ast.GraphPatternEdge{Start: p.pos, Direction: -1}
+			p.next()
+			edge.End_ = p.pos - 1
+			pattern.Elements = append(pattern.Elements, edge)
+
+		case token.DASHLBRACK:
+			// Named edge starting with -[
+			edge := &ast.GraphPatternEdge{Start: p.pos, Lbracket: p.pos + 1}
+			p.next()
+			edge.Name = p.parseIdent()
+			
+			// Check for range *min..max
+			if p.tok == token.MUL {
+				edge.RangeExpr = p.parseEdgeRange()
+			}
+
+			// Expect closing bracket with direction
+			if p.tok == token.RBRACKDASHGT {
+				edge.Rbracket = p.pos
+				edge.Direction = 1
+				p.next()
+				edge.End_ = p.pos - 1
+			} else if p.tok == token.RBRACKDASH {
+				edge.Rbracket = p.pos
+				edge.Direction = 0
+				p.next()
+				edge.End_ = p.pos - 1
+			} else if p.tok == token.RBRACKET {
+				edge.Rbracket = p.pos
+				edge.Direction = 0
+				p.next()
+				// Check for trailing - or ->
+				if p.tok == token.SUB {
+					p.next()
+					if p.tok == token.GTR {
+						edge.Direction = 1
+						p.next()
+					}
+				}
+				edge.End_ = p.pos - 1
+			} else {
+				p.error(p.pos, "expected ]-, ]->, or ]")
+			}
+			pattern.Elements = append(pattern.Elements, edge)
+
+		case token.LTDASHLBRACK:
+			// Named backward edge starting with <-[
+			edge := &ast.GraphPatternEdge{Start: p.pos, Lbracket: p.pos + 2, Direction: -1}
+			p.next()
+			edge.Name = p.parseIdent()
+
+			// Check for range *min..max
+			if p.tok == token.MUL {
+				edge.RangeExpr = p.parseEdgeRange()
+			}
+
+			// Expect closing ]- for backward edge
+			if p.tok == token.RBRACKDASH {
+				edge.Rbracket = p.pos
+				p.next()
+				edge.End_ = p.pos - 1
+			} else if p.tok == token.RBRACKET {
+				edge.Rbracket = p.pos
+				p.next()
+				if p.tok == token.SUB {
+					p.next()
+				}
+				edge.End_ = p.pos - 1
+			} else {
+				p.error(p.pos, "expected ]- or ]")
+			}
+			pattern.Elements = append(pattern.Elements, edge)
+
+		default:
+			// End of pattern
+			return pattern
+		}
+	}
+}
+
+// parseEdgeRange parses *min..max for edge ranges.
+func (p *Parser) parseEdgeRange() *ast.EdgeRange {
+	r := &ast.EdgeRange{Star: p.pos}
+	p.next() // consume *
+
+	// Parse optional min
+	if p.tok == token.INT {
+		r.MinVal = p.parseLiteral()
+	}
+
+	// Expect ..
+	if p.tok == token.DOTDOT {
+		r.DotDot = p.pos
+		p.next()
+
+		// Parse optional max
+		if p.tok == token.INT {
+			r.MaxVal = p.parseLiteral()
+		}
+	}
+
+	return r
+}
+
+// parseWhereClause parses a where clause for graph operators.
+func (p *Parser) parseWhereClause() *ast.WhereClause {
+	wherePos := p.pos
+	p.next() // consume 'where'
+	return &ast.WhereClause{
+		Where:     wherePos,
+		Predicate: p.parseExprNoPipe(),
+	}
+}
+
+// parseProjectClause parses a project clause for graph operators.
+func (p *Parser) parseProjectClause() *ast.ProjectClause {
+	projectPos := p.pos
+	p.next() // consume 'project'
+
+	clause := &ast.ProjectClause{Project: projectPos}
+	clause.Columns = p.parseNamedExprList()
+	return clause
 }

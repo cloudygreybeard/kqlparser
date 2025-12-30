@@ -171,7 +171,7 @@ func TestSpecificGrammarPatterns(t *testing.T) {
 		{"parse_with", `T | parse Text with * "=" Value`, false},
 		{"top_nested", "T | top-nested 5 of State by count()", false},
 		{"sample_distinct", "T | sample-distinct 10 of State", false},
-		{"graph_match", "G | graph-match (a)-[e]->(b) project a.Name", true}, // TODO: graph ops not supported
+		{"graph_match", "G | graph-match (a)-[e]->(b) project a.Name", false},
 
 		// Expressions
 		{"between", "T | where x between (1 .. 10)", false},

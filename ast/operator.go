@@ -356,12 +356,12 @@ func (x *MvExpandColumn) End() token.Pos {
 }
 
 type MvExpandOp struct {
-	Pipe          token.Pos          // Position of "|"
-	MvExpand      token.Pos          // Position of "mv-expand"
-	Params        []*OperatorParam   // Parameters (bagexpansion, with_itemindex)
-	LimitPos      token.Pos          // Position of "limit" (NoPos if none)
-	Limit         Expr               // Limit expression (nil if none)
-	Columns       []*MvExpandColumn  // Columns to expand
+	Pipe     token.Pos         // Position of "|"
+	MvExpand token.Pos         // Position of "mv-expand"
+	Params   []*OperatorParam  // Parameters (bagexpansion, with_itemindex)
+	LimitPos token.Pos         // Position of "limit" (NoPos if none)
+	Limit    Expr              // Limit expression (nil if none)
+	Columns  []*MvExpandColumn // Columns to expand
 }
 
 func (x *MvExpandOp) Pos() token.Pos { return x.Pipe }
@@ -847,6 +847,262 @@ func (x *ExternalDataOp) Pos() token.Pos { return x.ExternalData }
 func (x *ExternalDataOp) End() token.Pos { return x.EndPos }
 
 // GenericOp represents an unrecognized or less common operator.
+// ============================================================================
+// Graph Operators
+// ============================================================================
+
+// MakeGraphOp represents a make-graph operator.
+// Syntax: make-graph SourceColumn --> TargetColumn [with ...] [partitionedby ...]
+type MakeGraphOp struct {
+	Pipe         token.Pos        // Position of "|"
+	MakeGraph    token.Pos        // Position of "make-graph"
+	Params       []*OperatorParam // Optional parameters
+	SourceColumn Expr             // Source node column
+	Direction    token.Pos        // Position of "-->" or "--"
+	Directed     bool             // true for "-->" (directed), false for "--" (undirected)
+	TargetColumn Expr             // Target node column
+	WithClause   *MakeGraphWith   // Optional with clause
+}
+
+func (x *MakeGraphOp) Pos() token.Pos { return x.Pipe }
+func (x *MakeGraphOp) End() token.Pos {
+	if x.WithClause != nil {
+		return x.WithClause.End()
+	}
+	return x.TargetColumn.End()
+}
+
+// MakeGraphWith represents the with clause of make-graph.
+type MakeGraphWith struct {
+	WithPos token.Pos // Position of "with"
+	NodeId  *Ident    // Node ID column name (for with_node_id=name)
+	Table   Expr      // Table expression (for with Table on Column)
+	OnPos   token.Pos // Position of "on"
+	OnCol   Expr      // On column
+}
+
+func (x *MakeGraphWith) Pos() token.Pos { return x.WithPos }
+func (x *MakeGraphWith) End() token.Pos {
+	if x.OnCol != nil {
+		return x.OnCol.End()
+	}
+	if x.NodeId != nil {
+		return x.NodeId.End()
+	}
+	return x.WithPos
+}
+
+// GraphMatchOp represents a graph-match operator.
+// Syntax: graph-match (a)-[e]->(b) [where ...] [project ...]
+type GraphMatchOp struct {
+	Pipe       token.Pos              // Position of "|"
+	GraphMatch token.Pos              // Position of "graph-match"
+	Params     []*OperatorParam       // Optional parameters
+	Patterns   []*GraphMatchPattern   // Pattern elements
+	Where      *WhereClause           // Optional where clause
+	Project    *ProjectClause         // Optional project clause
+}
+
+func (x *GraphMatchOp) Pos() token.Pos { return x.Pipe }
+func (x *GraphMatchOp) End() token.Pos {
+	if x.Project != nil {
+		return x.Project.End()
+	}
+	if x.Where != nil {
+		return x.Where.End()
+	}
+	if len(x.Patterns) > 0 {
+		return x.Patterns[len(x.Patterns)-1].End()
+	}
+	return x.GraphMatch
+}
+
+// GraphMatchPattern represents a single pattern in graph-match.
+type GraphMatchPattern struct {
+	Elements []GraphPatternElement // Alternating nodes and edges
+}
+
+func (x *GraphMatchPattern) Pos() token.Pos {
+	if len(x.Elements) > 0 {
+		return x.Elements[0].Pos()
+	}
+	return token.NoPos
+}
+func (x *GraphMatchPattern) End() token.Pos {
+	if len(x.Elements) > 0 {
+		return x.Elements[len(x.Elements)-1].End()
+	}
+	return token.NoPos
+}
+
+// GraphPatternElement is an interface for graph pattern elements.
+type GraphPatternElement interface {
+	Node
+	graphPatternElement()
+}
+
+// GraphPatternNode represents a node in a graph pattern: (name)
+type GraphPatternNode struct {
+	Lparen token.Pos // Position of "("
+	Name   *Ident    // Node variable name
+	Rparen token.Pos // Position of ")"
+}
+
+func (x *GraphPatternNode) Pos() token.Pos         { return x.Lparen }
+func (x *GraphPatternNode) End() token.Pos         { return x.Rparen + 1 }
+func (x *GraphPatternNode) graphPatternElement()   {}
+
+// GraphPatternEdge represents an edge in a graph pattern: -[e]-> or --> or <-- or --
+type GraphPatternEdge struct {
+	Start     token.Pos // Position of first token (- or <)
+	Lbracket  token.Pos // Position of "[" (NoPos if unnamed)
+	Name      *Ident    // Edge variable name (nil if unnamed)
+	RangeExpr *EdgeRange // Optional range *min..max (nil if none)
+	Rbracket  token.Pos // Position of "]" (NoPos if unnamed)
+	End_      token.Pos // Position of last token (> or -)
+	Direction int       // 1 = -->, -1 = <--, 0 = --
+}
+
+func (x *GraphPatternEdge) Pos() token.Pos         { return x.Start }
+func (x *GraphPatternEdge) End() token.Pos         { return x.End_ + 1 }
+func (x *GraphPatternEdge) graphPatternElement()   {}
+
+// EdgeRange represents a range constraint on an edge: *1..5
+type EdgeRange struct {
+	Star   token.Pos // Position of "*"
+	MinVal Expr      // Minimum (may be nil)
+	DotDot token.Pos // Position of ".."
+	MaxVal Expr      // Maximum (may be nil)
+}
+
+func (x *EdgeRange) Pos() token.Pos { return x.Star }
+func (x *EdgeRange) End() token.Pos {
+	if x.MaxVal != nil {
+		return x.MaxVal.End()
+	}
+	return x.DotDot + 2
+}
+
+// WhereClause represents a where clause in graph operators.
+type WhereClause struct {
+	Where     token.Pos // Position of "where"
+	Predicate Expr      // Where predicate
+}
+
+func (x *WhereClause) Pos() token.Pos { return x.Where }
+func (x *WhereClause) End() token.Pos { return x.Predicate.End() }
+
+// ProjectClause represents a project clause in graph operators.
+type ProjectClause struct {
+	Project token.Pos    // Position of "project"
+	Columns []*NamedExpr // Projected columns
+}
+
+func (x *ProjectClause) Pos() token.Pos { return x.Project }
+func (x *ProjectClause) End() token.Pos {
+	if len(x.Columns) > 0 {
+		return x.Columns[len(x.Columns)-1].End()
+	}
+	return x.Project
+}
+
+// GraphShortestPathsOp represents a graph-shortest-paths operator.
+type GraphShortestPathsOp struct {
+	Pipe              token.Pos            // Position of "|"
+	GraphShortestPath token.Pos            // Position of "graph-shortest-paths"
+	Params            []*OperatorParam     // Optional parameters
+	Patterns          []*GraphMatchPattern // Pattern elements
+	Where             *WhereClause         // Optional where clause
+	Project           *ProjectClause       // Optional project clause
+}
+
+func (x *GraphShortestPathsOp) Pos() token.Pos { return x.Pipe }
+func (x *GraphShortestPathsOp) End() token.Pos {
+	if x.Project != nil {
+		return x.Project.End()
+	}
+	if x.Where != nil {
+		return x.Where.End()
+	}
+	if len(x.Patterns) > 0 {
+		return x.Patterns[len(x.Patterns)-1].End()
+	}
+	return x.GraphShortestPath
+}
+
+// GraphMarkComponentsOp represents a graph-mark-components operator.
+type GraphMarkComponentsOp struct {
+	Pipe                token.Pos        // Position of "|"
+	GraphMarkComponents token.Pos        // Position of "graph-mark-components"
+	Params              []*OperatorParam // Optional parameters
+}
+
+func (x *GraphMarkComponentsOp) Pos() token.Pos { return x.Pipe }
+func (x *GraphMarkComponentsOp) End() token.Pos {
+	if len(x.Params) > 0 {
+		return x.Params[len(x.Params)-1].Value.End()
+	}
+	return x.GraphMarkComponents + 22 // len("graph-mark-components")
+}
+
+// GraphToTableOp represents a graph-to-table operator.
+type GraphToTableOp struct {
+	Pipe         token.Pos              // Position of "|"
+	GraphToTable token.Pos              // Position of "graph-to-table"
+	Outputs      []*GraphToTableOutput  // Output clauses (nodes/edges)
+}
+
+func (x *GraphToTableOp) Pos() token.Pos { return x.Pipe }
+func (x *GraphToTableOp) End() token.Pos {
+	if len(x.Outputs) > 0 {
+		return x.Outputs[len(x.Outputs)-1].End()
+	}
+	return x.GraphToTable + 14 // len("graph-to-table")
+}
+
+// GraphToTableOutput represents a nodes or edges output clause.
+type GraphToTableOutput struct {
+	Keyword token.Pos        // Position of "nodes" or "edges"
+	IsNodes bool             // true for nodes, false for edges
+	AsName  *Ident           // Optional "as Name"
+	Params  []*OperatorParam // Parameters
+}
+
+func (x *GraphToTableOutput) Pos() token.Pos { return x.Keyword }
+func (x *GraphToTableOutput) End() token.Pos {
+	if len(x.Params) > 0 {
+		return x.Params[len(x.Params)-1].Value.End()
+	}
+	if x.AsName != nil {
+		return x.AsName.End()
+	}
+	return x.Keyword + 5 // approximate
+}
+
+// GraphWhereNodesOp represents a graph-where-nodes operator.
+type GraphWhereNodesOp struct {
+	Pipe            token.Pos // Position of "|"
+	GraphWhereNodes token.Pos // Position of "graph-where-nodes"
+	Predicate       Expr      // Filter predicate
+}
+
+func (x *GraphWhereNodesOp) Pos() token.Pos { return x.Pipe }
+func (x *GraphWhereNodesOp) End() token.Pos { return x.Predicate.End() }
+
+// GraphWhereEdgesOp represents a graph-where-edges operator.
+type GraphWhereEdgesOp struct {
+	Pipe            token.Pos // Position of "|"
+	GraphWhereEdges token.Pos // Position of "graph-where-edges"
+	Predicate       Expr      // Filter predicate
+}
+
+func (x *GraphWhereEdgesOp) Pos() token.Pos { return x.Pipe }
+func (x *GraphWhereEdgesOp) End() token.Pos { return x.Predicate.End() }
+
+// ============================================================================
+// Generic/Fallback Operator
+// ============================================================================
+
 // This allows parsing to continue even with operators we don't fully support.
 type GenericOp struct {
 	Pipe    token.Pos // Position of "|"

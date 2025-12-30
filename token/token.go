@@ -49,8 +49,15 @@ const (
 	SEMI   // ;
 	COMMA  // ,
 	DOT    // .
-	DOTDOT // ..
-	ARROW  // =>
+	DOTDOT     // ..
+	ARROW      // =>
+	DASHDASH   // -- (undirected edge)
+	DASHGT     // --> (directed edge forward)
+	LTDASH     // <-- (directed edge backward)
+	DASHLBRACK // -[ (edge name start)
+	LTDASHLBRACK // <-[ (edge name start backward)
+	RBRACKDASH   // ]- (edge name end undirected)
+	RBRACKDASHGT // ]-> (edge name end forward)
 
 	LPAREN   // (
 	RPAREN   // )
@@ -75,9 +82,16 @@ const (
 	FORK
 	GETSCHEMA
 	INVOKE
+	GRAPHMATCH
+	GRAPHMARKCOMPONENTS
+	GRAPHSHORTESTPATHS
+	GRAPHTOTABLE
+	GRAPHWHEREEDGES
+	GRAPHWHERENODES
 	JOIN
 	LIMIT
 	LOOKUP
+	MAKEGRAPH
 	MAKESERIES
 	MVAPPLY
 	MVEXPAND
@@ -126,6 +140,7 @@ const (
 	DATATABLE
 	DEFAULT
 	DESC
+	EDGES
 	EXTERNALDATA
 	FIRST
 	FROM
@@ -134,15 +149,18 @@ const (
 	KIND
 	LAST
 	MATERIALIZE
+	NODES
 	NOOPTIMIZATION
 	NULLS
 	OF
 	ON
+	PARTITIONEDBY
 	STEP
 	TO
 	TOSCALAR
 	TOTABLE
 	VIEW
+	WITHNODEID
 	WITH
 	WITHSOURCE
 
@@ -247,9 +265,16 @@ var tokenStrings = [...]string{
 	COLON:  ":",
 	SEMI:   ";",
 	COMMA:  ",",
-	DOT:    ".",
-	DOTDOT: "..",
-	ARROW:  "=>",
+	DOT:          ".",
+	DOTDOT:       "..",
+	ARROW:        "=>",
+	DASHDASH:     "--",
+	DASHGT:       "-->",
+	LTDASH:       "<--",
+	DASHLBRACK:   "-[",
+	LTDASHLBRACK: "<-[",
+	RBRACKDASH:   "]-",
+	RBRACKDASHGT: "]->",
 
 	LPAREN:   "(",
 	RPAREN:   ")",
@@ -272,11 +297,18 @@ var tokenStrings = [...]string{
 	GETSCHEMA:      "getschema",
 	INVOKE:         "invoke",
 	JOIN:           "join",
-	LIMIT:          "limit",
-	LOOKUP:         "lookup",
-	MAKESERIES:     "make-series",
-	MVAPPLY:        "mv-apply",
-	MVEXPAND:       "mv-expand",
+	GRAPHMATCH:          "graph-match",
+	GRAPHMARKCOMPONENTS: "graph-mark-components",
+	GRAPHSHORTESTPATHS:  "graph-shortest-paths",
+	GRAPHTOTABLE:        "graph-to-table",
+	GRAPHWHEREEDGES:     "graph-where-edges",
+	GRAPHWHERENODES:     "graph-where-nodes",
+	LIMIT:               "limit",
+	LOOKUP:              "lookup",
+	MAKEGRAPH:           "make-graph",
+	MAKESERIES:          "make-series",
+	MVAPPLY:             "mv-apply",
+	MVEXPAND:            "mv-expand",
 	ORDER:          "order",
 	PARSE:          "parse",
 	PARSEKV:        "parse-kv",
@@ -318,6 +350,7 @@ var tokenStrings = [...]string{
 	DATATABLE:      "datatable",
 	DEFAULT:        "default",
 	DESC:           "desc",
+	EDGES:          "edges",
 	EXTERNALDATA:   "externaldata",
 	FIRST:          "first",
 	FROM:           "from",
@@ -326,14 +359,17 @@ var tokenStrings = [...]string{
 	KIND:           "kind",
 	LAST:           "last",
 	MATERIALIZE:    "materialize",
+	NODES:          "nodes",
 	NOOPTIMIZATION: "nooptimization",
 	NULLS:          "nulls",
 	OF:             "of",
 	ON:             "on",
+	PARTITIONEDBY:  "partitionedby",
 	STEP:           "step",
 	TO:             "to",
 	TOSCALAR:       "toscalar",
 	TOTABLE:        "totable",
+	WITHNODEID:     "with_node_id",
 	VIEW:           "view",
 	WITH:           "with",
 	WITHSOURCE:     "withsource",
@@ -432,6 +468,13 @@ func init() {
 	// Add alternative spellings
 	keywords["mvapply"] = MVAPPLY
 	keywords["mvexpand"] = MVEXPAND
+	keywords["makegraph"] = MAKEGRAPH
+	keywords["graphmatch"] = GRAPHMATCH
+	keywords["graphshortestpaths"] = GRAPHSHORTESTPATHS
+	keywords["graphmarkcomponents"] = GRAPHMARKCOMPONENTS
+	keywords["graphtotable"] = GRAPHTOTABLE
+	keywords["graphwherenodes"] = GRAPHWHERENODES
+	keywords["graphwhereedges"] = GRAPHWHEREEDGES
 	keywords["external_data"] = EXTERNALDATA
 	keywords["with_source"] = WITHSOURCE
 	keywords["boolean"] = BOOLTYPE
