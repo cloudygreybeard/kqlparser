@@ -167,8 +167,21 @@ func (l *Lexer) Scan() Token {
 	l.skipWhitespace()
 
 	pos := l.file.Pos(l.offset)
+	ch := l.ch
 
-	switch ch := l.ch; {
+	// Check for h/H prefix strings BEFORE isLetter check
+	if ch == 'h' || ch == 'H' {
+		if next := l.peek(); next == '"' || next == '\'' || next == '`' || next == '~' {
+			startOffset := l.offset // remember start for multi-line strings
+			l.next()                // consume h
+			if l.ch == '`' || l.ch == '~' {
+				return l.scanMultiLineStringFrom(pos, startOffset)
+			}
+			return l.scanString(pos, l.ch)
+		}
+	}
+
+	switch {
 	case isLetter(ch):
 		return l.scanIdentifier(pos)
 	case isDigit(ch):
@@ -178,12 +191,10 @@ func (l *Lexer) Scan() Token {
 	case ch == '@' && (l.peek() == '"' || l.peek() == '\''):
 		l.next() // consume @
 		return l.scanVerbatimString(pos, l.ch)
-	case ch == 'h' || ch == 'H':
-		if next := l.peek(); next == '"' || next == '\'' {
-			l.next() // consume h
-			return l.scanString(pos, l.ch)
-		}
-		return l.scanIdentifier(pos)
+	case ch == '`':
+		return l.scanMultiLineString(pos)
+	case ch == '~':
+		return l.scanMultiLineString(pos)
 	default:
 		return l.scanOperator(pos)
 	}
@@ -381,6 +392,66 @@ func (l *Lexer) scanVerbatimString(pos token.Pos, quote rune) Token {
 		default:
 			l.next()
 		}
+	}
+}
+
+// scanMultiLineString scans a multi-line string (``` ... ``` or ~~~ ... ~~~).
+func (l *Lexer) scanMultiLineString(pos token.Pos) Token {
+	return l.scanMultiLineStringFrom(pos, l.offset)
+}
+
+// scanMultiLineStringFrom scans a multi-line string starting from a specific offset.
+// This is used when the string has a prefix like 'h' that was already consumed.
+func (l *Lexer) scanMultiLineStringFrom(pos token.Pos, start int) Token {
+	delimiter := l.ch // ` or ~
+
+	// Check for triple delimiter
+	if l.ch != delimiter {
+		l.error(l.offset, "expected multi-line string delimiter")
+		return Token{Type: token.ILLEGAL, Pos: pos, Lit: string(l.ch)}
+	}
+	l.next() // first char
+
+	if l.ch != delimiter {
+		// Not a triple delimiter, treat as error
+		l.error(l.offset, "expected triple delimiter for multi-line string")
+		return Token{Type: token.ILLEGAL, Pos: pos, Lit: l.src[start:l.offset]}
+	}
+	l.next() // second char
+
+	if l.ch != delimiter {
+		// Not a triple delimiter
+		l.error(l.offset, "expected triple delimiter for multi-line string")
+		return Token{Type: token.ILLEGAL, Pos: pos, Lit: l.src[start:l.offset]}
+	}
+	l.next() // third char - now we're inside the string
+
+	// Scan until we find the closing triple delimiter
+	for {
+		if l.ch == eof {
+			l.error(l.offset, "unterminated multi-line string literal")
+			return Token{Type: token.STRING, Pos: pos, Lit: l.src[start:l.offset]}
+		}
+
+		if l.ch == delimiter && l.peek() == delimiter {
+			// Potential closing delimiter, check for third
+			savedOffset := l.offset
+			l.next() // first delimiter
+			if l.ch == delimiter {
+				l.next() // second delimiter
+				if l.ch == delimiter {
+					l.next() // third delimiter - end of string
+					return Token{Type: token.STRING, Pos: pos, Lit: l.src[start:l.offset]}
+				}
+				// Not triple, continue
+			}
+			// Restore and continue if not triple
+			l.offset = savedOffset
+			l.rdOffset = savedOffset + 1
+			l.ch = rune(l.src[savedOffset])
+		}
+
+		l.next()
 	}
 }
 

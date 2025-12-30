@@ -11,9 +11,21 @@ print 'with\nescape'
 print @"verbatim string with \n literal backslash"
 print @'verbatim single quoted'
 
-// String Literals - Multi-line (TODO: not yet supported)
-// print ```multi line string```
-// print ~~~alternate multiline~~~
+// String Literals - Multi-line (triple backticks)
+print ```multi line string```
+
+print ```hello
+world```
+
+// String Literals - Multi-line (triple tildes)
+print ~~~alternate multiline~~~
+
+print ~~~multi
+line
+text~~~
+
+// String Literals - Multi-line with h prefix
+print h```obfuscated multiline```
 
 // String Literals - Hash-prefixed (obfuscated)
 print h"obfuscated"
