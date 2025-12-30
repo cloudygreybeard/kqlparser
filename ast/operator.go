@@ -895,12 +895,12 @@ func (x *MakeGraphWith) End() token.Pos {
 // GraphMatchOp represents a graph-match operator.
 // Syntax: graph-match (a)-[e]->(b) [where ...] [project ...]
 type GraphMatchOp struct {
-	Pipe       token.Pos              // Position of "|"
-	GraphMatch token.Pos              // Position of "graph-match"
-	Params     []*OperatorParam       // Optional parameters
-	Patterns   []*GraphMatchPattern   // Pattern elements
-	Where      *WhereClause           // Optional where clause
-	Project    *ProjectClause         // Optional project clause
+	Pipe       token.Pos            // Position of "|"
+	GraphMatch token.Pos            // Position of "graph-match"
+	Params     []*OperatorParam     // Optional parameters
+	Patterns   []*GraphMatchPattern // Pattern elements
+	Where      *WhereClause         // Optional where clause
+	Project    *ProjectClause       // Optional project clause
 }
 
 func (x *GraphMatchOp) Pos() token.Pos { return x.Pipe }
@@ -948,24 +948,24 @@ type GraphPatternNode struct {
 	Rparen token.Pos // Position of ")"
 }
 
-func (x *GraphPatternNode) Pos() token.Pos         { return x.Lparen }
-func (x *GraphPatternNode) End() token.Pos         { return x.Rparen + 1 }
-func (x *GraphPatternNode) graphPatternElement()   {}
+func (x *GraphPatternNode) Pos() token.Pos       { return x.Lparen }
+func (x *GraphPatternNode) End() token.Pos       { return x.Rparen + 1 }
+func (x *GraphPatternNode) graphPatternElement() {}
 
 // GraphPatternEdge represents an edge in a graph pattern: -[e]-> or --> or <-- or --
 type GraphPatternEdge struct {
-	Start     token.Pos // Position of first token (- or <)
-	Lbracket  token.Pos // Position of "[" (NoPos if unnamed)
-	Name      *Ident    // Edge variable name (nil if unnamed)
+	Start     token.Pos  // Position of first token (- or <)
+	Lbracket  token.Pos  // Position of "[" (NoPos if unnamed)
+	Name      *Ident     // Edge variable name (nil if unnamed)
 	RangeExpr *EdgeRange // Optional range *min..max (nil if none)
-	Rbracket  token.Pos // Position of "]" (NoPos if unnamed)
-	End_      token.Pos // Position of last token (> or -)
-	Direction int       // 1 = -->, -1 = <--, 0 = --
+	Rbracket  token.Pos  // Position of "]" (NoPos if unnamed)
+	End_      token.Pos  // Position of last token (> or -)
+	Direction int        // 1 = -->, -1 = <--, 0 = --
 }
 
-func (x *GraphPatternEdge) Pos() token.Pos         { return x.Start }
-func (x *GraphPatternEdge) End() token.Pos         { return x.End_ + 1 }
-func (x *GraphPatternEdge) graphPatternElement()   {}
+func (x *GraphPatternEdge) Pos() token.Pos       { return x.Start }
+func (x *GraphPatternEdge) End() token.Pos       { return x.End_ + 1 }
+func (x *GraphPatternEdge) graphPatternElement() {}
 
 // EdgeRange represents a range constraint on an edge: *1..5
 type EdgeRange struct {
@@ -1047,9 +1047,9 @@ func (x *GraphMarkComponentsOp) End() token.Pos {
 
 // GraphToTableOp represents a graph-to-table operator.
 type GraphToTableOp struct {
-	Pipe         token.Pos              // Position of "|"
-	GraphToTable token.Pos              // Position of "graph-to-table"
-	Outputs      []*GraphToTableOutput  // Output clauses (nodes/edges)
+	Pipe         token.Pos             // Position of "|"
+	GraphToTable token.Pos             // Position of "graph-to-table"
+	Outputs      []*GraphToTableOutput // Output clauses (nodes/edges)
 }
 
 func (x *GraphToTableOp) Pos() token.Pos { return x.Pipe }
@@ -1098,6 +1098,62 @@ type GraphWhereEdgesOp struct {
 
 func (x *GraphWhereEdgesOp) Pos() token.Pos { return x.Pipe }
 func (x *GraphWhereEdgesOp) End() token.Pos { return x.Predicate.End() }
+
+// ============================================================================
+// Additional Operators
+// ============================================================================
+
+// ExecuteAndCacheOp represents an execute-and-cache operator.
+type ExecuteAndCacheOp struct {
+	Pipe            token.Pos // Position of "|"
+	ExecuteAndCache token.Pos // Position of "execute-and-cache"
+}
+
+func (x *ExecuteAndCacheOp) Pos() token.Pos { return x.Pipe }
+func (x *ExecuteAndCacheOp) End() token.Pos { return x.ExecuteAndCache + 17 } // len("execute-and-cache")
+
+// AssertSchemaOp represents an assert-schema operator.
+type AssertSchemaOp struct {
+	Pipe         token.Pos // Position of "|"
+	AssertSchema token.Pos // Position of "assert-schema"
+	Lparen       token.Pos // Position of "("
+	Columns      []*ColumnDeclExpr // Schema columns
+	Rparen       token.Pos // Position of ")"
+}
+
+func (x *AssertSchemaOp) Pos() token.Pos { return x.Pipe }
+func (x *AssertSchemaOp) End() token.Pos { return x.Rparen + 1 }
+
+// MacroExpandOp represents a macro-expand operator.
+type MacroExpandOp struct {
+	Pipe        token.Pos        // Position of "|"
+	MacroExpand token.Pos        // Position of "macro-expand"
+	Params      []*OperatorParam // Optional parameters
+	EntityGroup Expr             // Entity group expression
+	AsPos       token.Pos        // Position of "as"
+	ScopeName   *Ident           // Scope name
+	Lparen      token.Pos        // Position of "("
+	Statements  []Stmt           // Statements in the macro body
+	Rparen      token.Pos        // Position of ")"
+}
+
+func (x *MacroExpandOp) Pos() token.Pos { return x.Pipe }
+func (x *MacroExpandOp) End() token.Pos { return x.Rparen + 1 }
+
+// PartitionByOp represents a partition-by operator (internal __partitionby).
+type PartitionByOp struct {
+	Pipe        token.Pos        // Position of "|"
+	PartitionBy token.Pos        // Position of "__partitionby" or "partition-by"
+	Params      []*OperatorParam // Optional parameters
+	Column      Expr             // Column to partition by
+	IdColumn    *Ident           // Optional ID column name
+	Lparen      token.Pos        // Position of "("
+	SubExpr     *PipeExpr        // Subexpression
+	Rparen      token.Pos        // Position of ")"
+}
+
+func (x *PartitionByOp) Pos() token.Pos { return x.Pipe }
+func (x *PartitionByOp) End() token.Pos { return x.Rparen + 1 }
 
 // ============================================================================
 // Generic/Fallback Operator

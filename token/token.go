@@ -82,6 +82,8 @@ const (
 	FORK
 	GETSCHEMA
 	INVOKE
+	ASSERTSCHEMA
+	EXECUTEANDCACHE
 	GRAPHMATCH
 	GRAPHMARKCOMPONENTS
 	GRAPHSHORTESTPATHS
@@ -89,6 +91,7 @@ const (
 	GRAPHWHEREEDGES
 	GRAPHWHERENODES
 	JOIN
+	MACROEXPAND
 	LIMIT
 	LOOKUP
 	MAKEGRAPH
@@ -297,12 +300,15 @@ var tokenStrings = [...]string{
 	GETSCHEMA:      "getschema",
 	INVOKE:         "invoke",
 	JOIN:           "join",
+	ASSERTSCHEMA:        "assert-schema",
+	EXECUTEANDCACHE:     "execute-and-cache",
 	GRAPHMATCH:          "graph-match",
 	GRAPHMARKCOMPONENTS: "graph-mark-components",
 	GRAPHSHORTESTPATHS:  "graph-shortest-paths",
 	GRAPHTOTABLE:        "graph-to-table",
 	GRAPHWHEREEDGES:     "graph-where-edges",
 	GRAPHWHERENODES:     "graph-where-nodes",
+	MACROEXPAND:         "macro-expand",
 	LIMIT:               "limit",
 	LOOKUP:              "lookup",
 	MAKEGRAPH:           "make-graph",
@@ -475,6 +481,10 @@ func init() {
 	keywords["graphtotable"] = GRAPHTOTABLE
 	keywords["graphwherenodes"] = GRAPHWHERENODES
 	keywords["graphwhereedges"] = GRAPHWHEREEDGES
+	keywords["assertschema"] = ASSERTSCHEMA
+	keywords["executeandcache"] = EXECUTEANDCACHE
+	keywords["execute_and_cache"] = EXECUTEANDCACHE
+	keywords["macroexpand"] = MACROEXPAND
 	keywords["external_data"] = EXTERNALDATA
 	keywords["with_source"] = WITHSOURCE
 	keywords["boolean"] = BOOLTYPE

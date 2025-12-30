@@ -105,6 +105,12 @@ func (p *Parser) parseOperator() ast.Operator {
 		return p.parseGraphWhereNodesOp(pipePos)
 	case token.GRAPHWHEREEDGES:
 		return p.parseGraphWhereEdgesOp(pipePos)
+	case token.EXECUTEANDCACHE:
+		return p.parseExecuteAndCacheOp(pipePos)
+	case token.ASSERTSCHEMA:
+		return p.parseAssertSchemaOp(pipePos)
+	case token.MACROEXPAND:
+		return p.parseMacroExpandOp(pipePos)
 	default:
 		return p.parseGenericOp(pipePos)
 	}
@@ -209,6 +215,12 @@ func (p *Parser) parseOperatorDirect() ast.Operator {
 		return p.parseGraphWhereNodesOp(pipePos)
 	case token.GRAPHWHEREEDGES:
 		return p.parseGraphWhereEdgesOp(pipePos)
+	case token.EXECUTEANDCACHE:
+		return p.parseExecuteAndCacheOp(pipePos)
+	case token.ASSERTSCHEMA:
+		return p.parseAssertSchemaOp(pipePos)
+	case token.MACROEXPAND:
+		return p.parseMacroExpandOp(pipePos)
 	default:
 		// Fall back to parsing as an expression (for simple expr-based subqueries)
 		return nil
@@ -1582,7 +1594,7 @@ func (p *Parser) parseParseKvOp(pipePos token.Pos) *ast.ParseKvOp {
 // ============================================================================
 
 // parseMakeGraphOp parses a make-graph operator.
-// Syntax: make-graph SourceColumn --> TargetColumn [with ...] 
+// Syntax: make-graph SourceColumn --> TargetColumn [with ...]
 func (p *Parser) parseMakeGraphOp(pipePos token.Pos) *ast.MakeGraphOp {
 	opPos := p.pos
 	p.next() // consume 'make-graph'
@@ -1615,9 +1627,9 @@ func (p *Parser) parseMakeGraphOp(pipePos token.Pos) *ast.MakeGraphOp {
 	if p.tok == token.WITH {
 		withPos := p.pos
 		p.next()
-		
+
 		op.WithClause = &ast.MakeGraphWith{WithPos: withPos}
-		
+
 		// Check for with_node_id = name
 		if p.tok == token.WITHNODEID || (p.tok == token.IDENT && p.lit == "with_node_id") {
 			p.next()
@@ -1821,7 +1833,7 @@ func (p *Parser) parseGraphPattern() *ast.GraphMatchPattern {
 			edge := &ast.GraphPatternEdge{Start: p.pos, Lbracket: p.pos + 1}
 			p.next()
 			edge.Name = p.parseIdent()
-			
+
 			// Check for range *min..max
 			if p.tok == token.MUL {
 				edge.RangeExpr = p.parseEdgeRange()
@@ -1933,4 +1945,96 @@ func (p *Parser) parseProjectClause() *ast.ProjectClause {
 	clause := &ast.ProjectClause{Project: projectPos}
 	clause.Columns = p.parseNamedExprList()
 	return clause
+}
+
+// ============================================================================
+// Additional Operators
+// ============================================================================
+
+// parseExecuteAndCacheOp parses an execute-and-cache operator.
+func (p *Parser) parseExecuteAndCacheOp(pipePos token.Pos) *ast.ExecuteAndCacheOp {
+	opPos := p.pos
+	p.next() // consume 'execute-and-cache'
+
+	return &ast.ExecuteAndCacheOp{
+		Pipe:            pipePos,
+		ExecuteAndCache: opPos,
+	}
+}
+
+// parseAssertSchemaOp parses an assert-schema operator.
+// Syntax: assert-schema (col1:type1, col2:type2, ...)
+func (p *Parser) parseAssertSchemaOp(pipePos token.Pos) *ast.AssertSchemaOp {
+	opPos := p.pos
+	p.next() // consume 'assert-schema'
+
+	op := &ast.AssertSchemaOp{Pipe: pipePos, AssertSchema: opPos}
+
+	// Parse schema: (col1:type1, col2:type2, ...)
+	if p.tok == token.LPAREN {
+		op.Lparen = p.pos
+		p.next()
+
+		for p.tok != token.RPAREN && p.tok != token.EOF {
+			// Parse column declaration: name:type
+			col := &ast.ColumnDeclExpr{Name: p.parseIdent()}
+			if p.tok == token.COLON {
+				col.Colon = p.pos
+				p.next()
+				col.Type = p.parseIdent()
+			}
+			op.Columns = append(op.Columns, col)
+
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+
+		op.Rparen = p.pos
+		p.expect(token.RPAREN)
+	}
+
+	return op
+}
+
+// parseMacroExpandOp parses a macro-expand operator.
+// Syntax: macro-expand EntityGroup as ScopeName (statements)
+func (p *Parser) parseMacroExpandOp(pipePos token.Pos) *ast.MacroExpandOp {
+	opPos := p.pos
+	p.next() // consume 'macro-expand'
+
+	op := &ast.MacroExpandOp{Pipe: pipePos, MacroExpand: opPos}
+
+	// Parse optional parameters
+	op.Params = p.parseOperatorParams()
+
+	// Parse entity group expression
+	op.EntityGroup = p.parseExprNoPipe()
+
+	// Parse 'as ScopeName'
+	if p.tok == token.AS {
+		op.AsPos = p.pos
+		p.next()
+		op.ScopeName = p.parseIdent()
+	}
+
+	// Parse '( statements )'
+	if p.tok == token.LPAREN {
+		op.Lparen = p.pos
+		p.next()
+
+		// Parse statements (simplified - just parse until closing paren)
+		for p.tok != token.RPAREN && p.tok != token.EOF {
+			stmt := p.parseStmt()
+			if stmt != nil {
+				op.Statements = append(op.Statements, stmt)
+			}
+			p.accept(token.SEMI) // optional semicolon between statements
+		}
+
+		op.Rparen = p.pos
+		p.expect(token.RPAREN)
+	}
+
+	return op
 }
