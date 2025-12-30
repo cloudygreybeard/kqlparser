@@ -92,6 +92,7 @@ const (
 	GRAPHWHERENODES
 	JOIN
 	MACROEXPAND
+	PARTITIONBY
 	LIMIT
 	LOOKUP
 	MAKEGRAPH
@@ -309,6 +310,7 @@ var tokenStrings = [...]string{
 	GRAPHWHEREEDGES:     "graph-where-edges",
 	GRAPHWHERENODES:     "graph-where-nodes",
 	MACROEXPAND:         "macro-expand",
+	PARTITIONBY:         "__partitionby",
 	LIMIT:               "limit",
 	LOOKUP:              "lookup",
 	MAKEGRAPH:           "make-graph",
@@ -485,6 +487,7 @@ func init() {
 	keywords["executeandcache"] = EXECUTEANDCACHE
 	keywords["execute_and_cache"] = EXECUTEANDCACHE
 	keywords["macroexpand"] = MACROEXPAND
+	keywords["__partitionby"] = PARTITIONBY
 	keywords["external_data"] = EXTERNALDATA
 	keywords["with_source"] = WITHSOURCE
 	keywords["boolean"] = BOOLTYPE

@@ -111,6 +111,8 @@ func (p *Parser) parseOperator() ast.Operator {
 		return p.parseAssertSchemaOp(pipePos)
 	case token.MACROEXPAND:
 		return p.parseMacroExpandOp(pipePos)
+	case token.PARTITIONBY:
+		return p.parsePartitionByOp(pipePos)
 	default:
 		return p.parseGenericOp(pipePos)
 	}
@@ -221,6 +223,8 @@ func (p *Parser) parseOperatorDirect() ast.Operator {
 		return p.parseAssertSchemaOp(pipePos)
 	case token.MACROEXPAND:
 		return p.parseMacroExpandOp(pipePos)
+	case token.PARTITIONBY:
+		return p.parsePartitionByOp(pipePos)
 	default:
 		// Fall back to parsing as an expression (for simple expr-based subqueries)
 		return nil
@@ -2031,6 +2035,42 @@ func (p *Parser) parseMacroExpandOp(pipePos token.Pos) *ast.MacroExpandOp {
 			}
 			p.accept(token.SEMI) // optional semicolon between statements
 		}
+
+		op.Rparen = p.pos
+		p.expect(token.RPAREN)
+	}
+
+	return op
+}
+
+// parsePartitionByOp parses a partition-by operator.
+// Syntax: __partitionby [params] Column [id GUID] (subquery)
+func (p *Parser) parsePartitionByOp(pipePos token.Pos) *ast.PartitionByOp {
+	opPos := p.pos
+	p.next() // consume '__partitionby'
+
+	op := &ast.PartitionByOp{Pipe: pipePos, PartitionBy: opPos}
+
+	// Parse optional parameters
+	op.Params = p.parseOperatorParams()
+
+	// Parse column expression (just an identifier, not a full expression)
+	// This prevents the following '(' from being interpreted as a function call
+	op.Column = p.parseIdent()
+
+	// Parse optional 'id GUID' clause
+	if p.tok == token.IDENT && p.lit == "id" {
+		p.next() // consume 'id'
+		op.IdColumn = p.parseIdent()
+	}
+
+	// Parse '( subquery )'
+	if p.tok == token.LPAREN {
+		op.Lparen = p.pos
+		p.next()
+
+		// Parse subquery as a contextual subexpression
+		op.SubExpr = p.parseContextualSubExpr()
 
 		op.Rparen = p.pos
 		p.expect(token.RPAREN)
