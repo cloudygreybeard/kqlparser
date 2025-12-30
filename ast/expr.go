@@ -168,3 +168,29 @@ func (x *PipeExpr) End() token.Pos {
 	}
 	return x.Source.End()
 }
+
+// ToScalarExpr represents a toscalar expression that converts a tabular result to scalar.
+// Syntax: toscalar([kind=nooptimization] (pipe_expression))
+type ToScalarExpr struct {
+	ToScalar     token.Pos // Position of "toscalar"
+	NoOptimize   bool      // Whether kind=nooptimization is specified
+	Lparen       token.Pos // Position of "("
+	Query        Expr      // The pipe expression inside (usually a PipeExpr)
+	Rparen       token.Pos // Position of ")"
+}
+
+func (x *ToScalarExpr) Pos() token.Pos { return x.ToScalar }
+func (x *ToScalarExpr) End() token.Pos { return x.Rparen + 1 }
+
+// ToTableExpr represents a totable expression that ensures tabular result.
+// Syntax: totable([kind=nooptimization] (pipe_expression))
+type ToTableExpr struct {
+	ToTable      token.Pos // Position of "totable"
+	NoOptimize   bool      // Whether kind=nooptimization is specified
+	Lparen       token.Pos // Position of "("
+	Query        Expr      // The pipe expression inside (usually a PipeExpr)
+	Rparen       token.Pos // Position of ")"
+}
+
+func (x *ToTableExpr) Pos() token.Pos { return x.ToTable }
+func (x *ToTableExpr) End() token.Pos { return x.Rparen + 1 }

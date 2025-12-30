@@ -544,6 +544,70 @@ func TestParseOpWithTypes(t *testing.T) {
 	}
 }
 
+func TestToScalarExpr(t *testing.T) {
+	src := `print x = toscalar(T | summarize count())`
+	p := New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+	if len(script.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(script.Stmts))
+	}
+	printStmt, ok := script.Stmts[0].(*ast.PrintStmt)
+	if !ok {
+		t.Fatalf("expected PrintStmt, got %T", script.Stmts[0])
+	}
+	if len(printStmt.Columns) != 1 {
+		t.Fatalf("expected 1 column, got %d", len(printStmt.Columns))
+	}
+	namedExpr := printStmt.Columns[0]
+	if namedExpr.Name.Name != "x" {
+		t.Errorf("name: got %q, want x", namedExpr.Name.Name)
+	}
+	toScalar, ok := namedExpr.Expr.(*ast.ToScalarExpr)
+	if !ok {
+		t.Fatalf("expected ToScalarExpr, got %T", namedExpr.Expr)
+	}
+	pipeExpr, ok := toScalar.Query.(*ast.PipeExpr)
+	if !ok {
+		t.Fatalf("expected PipeExpr in toscalar, got %T", toScalar.Query)
+	}
+	if len(pipeExpr.Operators) != 1 {
+		t.Errorf("expected 1 operator, got %d", len(pipeExpr.Operators))
+	}
+	if _, ok := pipeExpr.Operators[0].(*ast.SummarizeOp); !ok {
+		t.Errorf("expected SummarizeOp, got %T", pipeExpr.Operators[0])
+	}
+}
+
+func TestToTableExpr(t *testing.T) {
+	src := `totable(T | project A, B)`
+	p := New("test", src)
+	script := p.Parse()
+	if errs := p.Errors(); len(errs) > 0 {
+		t.Fatalf("parse errors: %v", errs)
+	}
+	if len(script.Stmts) != 1 {
+		t.Fatalf("expected 1 statement, got %d", len(script.Stmts))
+	}
+	exprStmt, ok := script.Stmts[0].(*ast.ExprStmt)
+	if !ok {
+		t.Fatalf("expected ExprStmt, got %T", script.Stmts[0])
+	}
+	toTable, ok := exprStmt.X.(*ast.ToTableExpr)
+	if !ok {
+		t.Fatalf("expected ToTableExpr, got %T", exprStmt.X)
+	}
+	pipeExpr, ok := toTable.Query.(*ast.PipeExpr)
+	if !ok {
+		t.Fatalf("expected PipeExpr in totable, got %T", toTable.Query)
+	}
+	if len(pipeExpr.Operators) != 1 {
+		t.Errorf("expected 1 operator, got %d", len(pipeExpr.Operators))
+	}
+}
+
 func TestNewOperators(t *testing.T) {
 	tests := []struct {
 		name string
@@ -561,6 +625,8 @@ func TestNewOperators(t *testing.T) {
 		{"parse-where", "T | parse-where Message '*error*'"},
 		{"parse-kv", "T | parse-kv Data as (key1, key2)"},
 		{"parse-with-types", "T | parse Text with Key:string \"=\" Value:long"},
+		{"toscalar", "print toscalar(T | summarize count())"},
+		{"totable", "totable(T | project A)"},
 	}
 
 	for _, tt := range tests {

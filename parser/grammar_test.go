@@ -180,7 +180,7 @@ func TestSpecificGrammarPatterns(t *testing.T) {
 		{"string_has", `T | where Text has "word"`, false},
 		{"string_contains", `T | where Text contains "sub"`, false},
 		{"matches_regex", `T | where Text matches regex "^[0-9]+$"`, false},
-		{"toscalar", "print toscalar(T | summarize count())", true}, // TODO: pipe in toscalar not supported
+		{"toscalar", "print toscalar(T | summarize count())", false}, // toscalar with pipe now supported
 		{"path_access", "print obj.prop.nested", false},
 		{"element_access", "print arr[0]", false},
 

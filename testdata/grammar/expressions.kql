@@ -112,6 +112,13 @@ T | where Name likecs "Pattern*"
 
 T | where Name notlikecs "Bad*"
 
+// toscalar/totable expressions
+print toscalar(T | summarize count())
+
+print x = toscalar(Events | where Level == "Error" | count)
+
+totable(T | project A, B)
+
 // String Operators - matches regex
 T | where Text matches regex "^[a-z]+$"
 

@@ -626,6 +626,12 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 	case token.DATATABLE:
 		return p.parseDatatableExpr()
 
+	case token.TOSCALAR:
+		return p.parseToScalarExpr()
+
+	case token.TOTABLE:
+		return p.parseToTableExpr()
+
 	// Handle keywords that can be used as identifiers in certain contexts
 	case token.COUNT:
 		return p.parseIdent()
@@ -749,6 +755,60 @@ func (p *Parser) parseJSONObject() *ast.ListExpr {
 func (p *Parser) parseDatatableExpr() ast.Expr {
 	// For now, parse as a function call
 	return p.parseIdent()
+}
+
+// parseToScalarExpr parses a toscalar expression.
+// Syntax: toscalar([kind=nooptimization] (pipe_expression))
+func (p *Parser) parseToScalarExpr() *ast.ToScalarExpr {
+	pos := p.pos
+	p.next() // consume 'toscalar'
+
+	expr := &ast.ToScalarExpr{ToScalar: pos}
+
+	// Check for optional kind=nooptimization
+	if p.tok == token.KIND {
+		p.next()
+		p.expect(token.ASSIGN)
+		// Expect 'nooptimization' identifier
+		p.parseIdent()
+		expr.NoOptimize = true
+	}
+
+	expr.Lparen = p.expect(token.LPAREN)
+
+	// Parse the inner expression as a full pipe expression
+	expr.Query = p.parseExpr()
+
+	expr.Rparen = p.expect(token.RPAREN)
+
+	return expr
+}
+
+// parseToTableExpr parses a totable expression.
+// Syntax: totable([kind=nooptimization] (pipe_expression))
+func (p *Parser) parseToTableExpr() *ast.ToTableExpr {
+	pos := p.pos
+	p.next() // consume 'totable'
+
+	expr := &ast.ToTableExpr{ToTable: pos}
+
+	// Check for optional kind=nooptimization
+	if p.tok == token.KIND {
+		p.next()
+		p.expect(token.ASSIGN)
+		// Expect 'nooptimization' identifier
+		p.parseIdent()
+		expr.NoOptimize = true
+	}
+
+	expr.Lparen = p.expect(token.LPAREN)
+
+	// Parse the inner expression as a full pipe expression
+	expr.Query = p.parseExpr()
+
+	expr.Rparen = p.expect(token.RPAREN)
+
+	return expr
 }
 
 // parseNamedExpr parses an optionally named expression.
