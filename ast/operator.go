@@ -523,13 +523,29 @@ func (x *InRangeExpr) End() token.Pos { return x.Rparen + 1 }
 
 // AsOp represents an as operator (name a result).
 type AsOp struct {
-	Pipe token.Pos // Position of "|"
-	As   token.Pos // Position of "as"
-	Name *Ident    // Result name
+	Pipe   token.Pos        // Position of "|"
+	As     token.Pos        // Position of "as"
+	Params []*OperatorParam // Optional parameters (e.g., hint.materialized=true)
+	Name   *Ident           // Result name
 }
 
 func (x *AsOp) Pos() token.Pos { return x.Pipe }
 func (x *AsOp) End() token.Pos { return x.Name.End() }
+
+// ConsumeOp represents a consume operator.
+type ConsumeOp struct {
+	Pipe    token.Pos        // Position of "|"
+	Consume token.Pos        // Position of "consume"
+	Params  []*OperatorParam // Optional parameters
+}
+
+func (x *ConsumeOp) Pos() token.Pos { return x.Pipe }
+func (x *ConsumeOp) End() token.Pos {
+	if len(x.Params) > 0 {
+		return x.Params[len(x.Params)-1].Value.End()
+	}
+	return x.Consume + 7 // len("consume")
+}
 
 // GetSchemaOp represents a getschema operator.
 type GetSchemaOp struct {
@@ -577,15 +593,6 @@ type ScanOp struct {
 
 func (x *ScanOp) Pos() token.Pos { return x.Pipe }
 func (x *ScanOp) End() token.Pos { return x.EndPos }
-
-// ConsumeOp represents a consume operator.
-type ConsumeOp struct {
-	Pipe    token.Pos // Position of "|"
-	Consume token.Pos // Position of "consume"
-}
-
-func (x *ConsumeOp) Pos() token.Pos { return x.Pipe }
-func (x *ConsumeOp) End() token.Pos { return x.Consume + 7 } // len("consume")
 
 // EvaluateOp represents an evaluate operator (plugin invocation).
 type EvaluateOp struct {

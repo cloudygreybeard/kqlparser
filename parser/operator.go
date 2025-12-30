@@ -834,17 +834,20 @@ func (p *Parser) parseSearchOp(pipePos token.Pos) *ast.SearchOp {
 }
 
 // parseAsOp parses an as operator.
+// Syntax: as [params] Name
 func (p *Parser) parseAsOp(pipePos token.Pos) *ast.AsOp {
 	asPos := p.pos
 	p.next() // consume 'as'
 
-	name := p.parseIdent()
+	op := &ast.AsOp{Pipe: pipePos, As: asPos}
 
-	return &ast.AsOp{
-		Pipe: pipePos,
-		As:   asPos,
-		Name: name,
-	}
+	// Parse optional parameters (e.g., hint.materialized=true)
+	op.Params = p.parseOperatorParams()
+
+	// Parse the name
+	op.Name = p.parseIdent()
+
+	return op
 }
 
 // parseGetSchemaOp parses a getschema operator.
@@ -1135,14 +1138,17 @@ func (p *Parser) parseScanOp(pipePos token.Pos) *ast.ScanOp {
 }
 
 // parseConsumeOp parses a consume operator.
+// Syntax: consume [params]
 func (p *Parser) parseConsumeOp(pipePos token.Pos) *ast.ConsumeOp {
 	opPos := p.pos
 	p.next() // consume 'consume'
 
-	return &ast.ConsumeOp{
-		Pipe:    pipePos,
-		Consume: opPos,
-	}
+	op := &ast.ConsumeOp{Pipe: pipePos, Consume: opPos}
+
+	// Parse optional parameters
+	op.Params = p.parseOperatorParams()
+
+	return op
 }
 
 // parseEvaluateOp parses an evaluate operator.

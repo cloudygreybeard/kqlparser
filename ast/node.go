@@ -77,11 +77,11 @@ func (*SearchOp) node()              {}
 func (*SampleOp) node()              {}
 func (*SampleDistinctOp) node()      {}
 func (*AsOp) node()                  {}
+func (*ConsumeOp) node()             {}
 func (*GetSchemaOp) node()           {}
 func (*SerializeOp) node()           {}
 func (*InvokeOp) node()              {}
 func (*ScanOp) node()                {}
-func (*ConsumeOp) node()             {}
 func (*EvaluateOp) node()            {}
 func (*ReduceOp) node()              {}
 func (*ForkOp) node()                {}
@@ -174,11 +174,11 @@ func (*SearchOp) operator()              {}
 func (*SampleOp) operator()              {}
 func (*SampleDistinctOp) operator()      {}
 func (*AsOp) operator()                  {}
+func (*ConsumeOp) operator()             {}
 func (*GetSchemaOp) operator()           {}
 func (*SerializeOp) operator()           {}
 func (*InvokeOp) operator()              {}
 func (*ScanOp) operator()                {}
-func (*ConsumeOp) operator()             {}
 func (*EvaluateOp) operator()            {}
 func (*ReduceOp) operator()              {}
 func (*ForkOp) operator()                {}
