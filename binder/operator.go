@@ -279,7 +279,10 @@ func (b *Binder) bindProjectAwayOp(op *ast.ProjectAwayOp, inputType types.Type) 
 // bindMvExpandOp binds an mv-expand operator.
 func (b *Binder) bindMvExpandOp(op *ast.MvExpandOp, inputType types.Type) types.Type {
 	for _, col := range op.Columns {
-		b.bindExpr(col)
+		b.bindExpr(col.Expr)
+		if col.Type != nil {
+			b.bindExpr(col.Type)
+		}
 	}
 	// mv-expand keeps schema but expanded columns become scalar
 	return inputType
@@ -469,7 +472,7 @@ func (b *Binder) bindMakeSeriesOp(op *ast.MakeSeriesOp, inputType types.Type) ty
 	// Aggregate columns become arrays
 	for _, agg := range op.Aggregates {
 		b.bindExpr(agg.Expr)
-		name := b.getColumnName(agg)
+		name := b.getColumnName(agg.Expr)
 		columns = append(columns, &types.Column{Name: name, Type: types.Typ_Dynamic})
 	}
 

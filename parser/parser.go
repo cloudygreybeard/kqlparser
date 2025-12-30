@@ -395,6 +395,55 @@ func (p *Parser) parsePipeExpr(source ast.Expr) *ast.PipeExpr {
 	return pipe
 }
 
+// parseContextualSubExpr parses a contextual subexpression inside parentheses.
+// This is used for mv-apply, toscalar, totable, etc. where the inner expression
+// can be either:
+// 1. A simple expression like "x > 10"
+// 2. An operator-based expression like "summarize count()" or "where x > y"
+func (p *Parser) parseContextualSubExpr() *ast.PipeExpr {
+	pipe := &ast.PipeExpr{}
+
+	// First, check if we're starting with an operator keyword
+	if p.isOperatorKeyword() {
+		// Parse operator directly (without leading |)
+		firstOp := p.parseOperatorDirect()
+		if firstOp != nil {
+			pipe.Operators = append(pipe.Operators, firstOp)
+		}
+	} else {
+		// Parse as a regular expression (the source)
+		pipe.Source = p.parseExprNoPipe()
+	}
+
+	// Then parse any subsequent piped operators
+	for p.tok == token.PIPE {
+		op := p.parseOperator()
+		if op != nil {
+			pipe.Operators = append(pipe.Operators, op)
+		}
+	}
+
+	return pipe
+}
+
+// isOperatorKeyword returns true if the current token is a KQL operator keyword.
+func (p *Parser) isOperatorKeyword() bool {
+	switch p.tok {
+	case token.WHERE, token.FILTER, token.PROJECT, token.PROJECTAWAY, token.EXTEND,
+		token.SUMMARIZE, token.SORT, token.ORDER, token.TAKE, token.LIMIT,
+		token.TOP, token.COUNT, token.DISTINCT, token.JOIN, token.UNION,
+		token.RENDER, token.PARSE, token.PARSEWHERE, token.PARSEKV,
+		token.MVEXPAND, token.SEARCH, token.AS, token.GETSCHEMA, token.SERIALIZE,
+		token.INVOKE, token.PROJECTRENAME, token.PROJECTREORDER, token.SAMPLE,
+		token.SAMPLEDISTINCT, token.LOOKUP, token.MAKESERIES, token.SCAN,
+		token.CONSUME, token.EVALUATE, token.REDUCE, token.FORK, token.FACET,
+		token.PROJECTKEEP, token.TOPNESTED, token.TOPHITTERS, token.MVAPPLY, token.FIND:
+		return true
+	default:
+		return false
+	}
+}
+
 // parseOrExpr parses an 'or' expression.
 func (p *Parser) parseOrExpr() ast.Expr {
 	left := p.parseAndExpr()

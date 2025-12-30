@@ -167,7 +167,7 @@ func TestSpecificGrammarPatterns(t *testing.T) {
 		{"union_wildcard", "union T*", false},
 		{"make_series", "T | make-series count() on Time step 1h", false},
 		{"mv_expand", "T | mv-expand Col", false},
-		{"mv_apply", "T | mv-apply x = Arr on (extend y = x * 2)", true}, // TODO: assignment form not supported
+		{"mv_apply", "T | mv-apply x = Arr on (extend y = x * 2)", false},
 		{"parse_with", `T | parse Text with * "=" Value`, false},
 		{"top_nested", "T | top-nested 5 of State by count()", false},
 		{"sample_distinct", "T | sample-distinct 10 of State", false},

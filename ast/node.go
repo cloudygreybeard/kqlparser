@@ -90,6 +90,8 @@ func (*ProjectKeepOp) node()    {}
 func (*TopNestedOp) node()      {}
 func (*TopHittersOp) node()     {}
 func (*MvApplyOp) node()        {}
+func (*MvApplyColumn) node()    {}
+func (*MvExpandColumn) node()   {}
 func (*FindOp) node()           {}
 func (*PrintStmt) node()        {}
 func (*RangeStmt) node()        {}
@@ -99,32 +101,32 @@ func (*GenericOp) node()        {}
 func (*Script) node()           {}
 
 // Expression nodes implement Expr
-func (*Ident) expr()        {}
-func (*BadExpr) expr()      {}
-func (*BasicLit) expr()     {}
-func (*ParenExpr) expr()    {}
-func (*UnaryExpr) expr()    {}
-func (*BinaryExpr) expr()   {}
-func (*CallExpr) expr()     {}
-func (*IndexExpr) expr()    {}
-func (*SelectorExpr) expr() {}
-func (*ListExpr) expr()     {}
-func (*BetweenExpr) expr()  {}
-func (*DynamicLit) expr()   {}
-func (*StarExpr) expr()     {}
-func (*NamedExpr) expr()    {}
-func (*PipeExpr) expr()     {}
+func (*Ident) expr()           {}
+func (*BadExpr) expr()         {}
+func (*BasicLit) expr()        {}
+func (*ParenExpr) expr()       {}
+func (*UnaryExpr) expr()       {}
+func (*BinaryExpr) expr()      {}
+func (*CallExpr) expr()        {}
+func (*IndexExpr) expr()       {}
+func (*SelectorExpr) expr()    {}
+func (*ListExpr) expr()        {}
+func (*BetweenExpr) expr()     {}
+func (*DynamicLit) expr()      {}
+func (*StarExpr) expr()        {}
+func (*NamedExpr) expr()       {}
+func (*PipeExpr) expr()        {}
 func (*ToScalarExpr) expr()    {}
 func (*ToTableExpr) expr()     {}
 func (*MaterializeExpr) expr() {}
 
 // Statement nodes implement Stmt
-func (*LetStmt) stmt()       {}
-func (*ExprStmt) stmt()      {}
-func (*QueryStmt) stmt()     {}
-func (*PrintStmt) stmt()     {}
-func (*RangeStmt) stmt()     {}
-func (*DatatableStmt) stmt() {}
+func (*LetStmt) stmt()        {}
+func (*ExprStmt) stmt()       {}
+func (*QueryStmt) stmt()      {}
+func (*PrintStmt) stmt()      {}
+func (*RangeStmt) stmt()      {}
+func (*DatatableStmt) stmt()  {}
 func (*ExternalDataOp) stmt() {}
 
 // Operator nodes implement Operator

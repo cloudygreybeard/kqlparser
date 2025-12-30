@@ -96,6 +96,97 @@ func (p *Parser) parseOperator() ast.Operator {
 	}
 }
 
+// parseOperatorDirect parses an operator without a leading pipe.
+// This is used for contextual subexpressions inside mv-apply, toscalar, etc.
+func (p *Parser) parseOperatorDirect() ast.Operator {
+	// Use token.NoPos for the pipe position since there's no leading pipe
+	pipePos := token.NoPos
+
+	switch p.tok {
+	case token.WHERE, token.FILTER:
+		return p.parseWhereOp(pipePos)
+	case token.PROJECT:
+		return p.parseProjectOp(pipePos)
+	case token.PROJECTAWAY:
+		return p.parseProjectAwayOp(pipePos)
+	case token.EXTEND:
+		return p.parseExtendOp(pipePos)
+	case token.SUMMARIZE:
+		return p.parseSummarizeOp(pipePos)
+	case token.SORT, token.ORDER:
+		return p.parseSortOp(pipePos)
+	case token.TAKE, token.LIMIT:
+		return p.parseTakeOp(pipePos)
+	case token.TOP:
+		return p.parseTopOp(pipePos)
+	case token.COUNT:
+		return p.parseCountOp(pipePos)
+	case token.DISTINCT:
+		return p.parseDistinctOp(pipePos)
+	case token.JOIN:
+		return p.parseJoinOp(pipePos)
+	case token.UNION:
+		return p.parseUnionOp(pipePos)
+	case token.RENDER:
+		return p.parseRenderOp(pipePos)
+	case token.PARSE:
+		return p.parseParseOp(pipePos)
+	case token.PARSEWHERE:
+		return p.parseParseWhereOp(pipePos)
+	case token.PARSEKV:
+		return p.parseParseKvOp(pipePos)
+	case token.MVEXPAND:
+		return p.parseMvExpandOp(pipePos)
+	case token.SEARCH:
+		return p.parseSearchOp(pipePos)
+	case token.AS:
+		return p.parseAsOp(pipePos)
+	case token.GETSCHEMA:
+		return p.parseGetSchemaOp(pipePos)
+	case token.SERIALIZE:
+		return p.parseSerializeOp(pipePos)
+	case token.INVOKE:
+		return p.parseInvokeOp(pipePos)
+	case token.PROJECTRENAME:
+		return p.parseProjectRenameOp(pipePos)
+	case token.PROJECTREORDER:
+		return p.parseProjectReorderOp(pipePos)
+	case token.SAMPLE:
+		return p.parseSampleOp(pipePos)
+	case token.SAMPLEDISTINCT:
+		return p.parseSampleDistinctOp(pipePos)
+	case token.LOOKUP:
+		return p.parseLookupOp(pipePos)
+	case token.MAKESERIES:
+		return p.parseMakeSeriesOp(pipePos)
+	case token.SCAN:
+		return p.parseScanOp(pipePos)
+	case token.CONSUME:
+		return p.parseConsumeOp(pipePos)
+	case token.EVALUATE:
+		return p.parseEvaluateOp(pipePos)
+	case token.REDUCE:
+		return p.parseReduceOp(pipePos)
+	case token.FORK:
+		return p.parseForkOp(pipePos)
+	case token.FACET:
+		return p.parseFacetOp(pipePos)
+	case token.PROJECTKEEP:
+		return p.parseProjectKeepOp(pipePos)
+	case token.TOPNESTED:
+		return p.parseTopNestedOp(pipePos)
+	case token.TOPHITTERS:
+		return p.parseTopHittersOp(pipePos)
+	case token.MVAPPLY:
+		return p.parseMvApplyOp(pipePos)
+	case token.FIND:
+		return p.parseFindOp(pipePos)
+	default:
+		// Fall back to parsing as an expression (for simple expr-based subqueries)
+		return nil
+	}
+}
+
 // parseWhereOp parses a where operator.
 func (p *Parser) parseWhereOp(pipePos token.Pos) *ast.WhereOp {
 	wherePos := p.pos
@@ -629,16 +720,63 @@ func (p *Parser) parseMvExpandOp(pipePos token.Pos) *ast.MvExpandOp {
 	mvExpandPos := p.pos
 	p.next() // consume 'mv-expand'
 
-	var columns []ast.Expr
+	op := &ast.MvExpandOp{Pipe: pipePos, MvExpand: mvExpandPos}
+
+	// Parse parameters (bagexpansion, with_itemindex)
+	op.Params = p.parseOperatorParams()
+
+	// Parse optional limit
+	if p.tok == token.LIMIT {
+		op.LimitPos = p.pos
+		p.next()
+		op.Limit = p.parseLiteral()
+	}
+
+	// Parse columns with optional name, assignment, and type annotation
 	for p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
-		col := p.parseExpr()
-		columns = append(columns, col)
+		col := &ast.MvExpandColumn{}
+
+		// Check for named column (name = expr)
+		if p.tok == token.IDENT {
+			// Look ahead to see if there's an =
+			savedOffset := p.lex.Offset()
+			savedPos := p.pos
+			savedTok := p.tok
+			savedLit := p.lit
+
+			name := p.parseIdent()
+			if p.tok == token.ASSIGN {
+				col.Name = name
+				col.Assign = p.pos
+				p.next() // consume '='
+				col.Expr = p.parseUnaryExpr()
+			} else {
+				// Not a named column, restore and parse as expression
+				p.lex.Reset(savedOffset)
+				p.pos = savedPos
+				p.tok = savedTok
+				p.lit = savedLit
+				col.Expr = p.parseUnaryExpr()
+			}
+		} else {
+			col.Expr = p.parseUnaryExpr()
+		}
+
+		// Check for 'to typeof(type)'
+		if p.tok == token.TO {
+			col.ToPos = p.pos
+			p.next()
+			col.Type = p.parseUnaryExpr() // typeof(long)
+		}
+
+		op.Columns = append(op.Columns, col)
+
 		if !p.accept(token.COMMA) {
 			break
 		}
 	}
 
-	return &ast.MvExpandOp{Pipe: pipePos, MvExpand: mvExpandPos, Columns: columns}
+	return op
 }
 
 // parseSearchOp parses a search operator.
@@ -839,10 +977,21 @@ func (p *Parser) parseMakeSeriesOp(pipePos token.Pos) *ast.MakeSeriesOp {
 
 	op := &ast.MakeSeriesOp{Pipe: pipePos, MakeSeries: opPos}
 
-	// Parse aggregates until 'on'
+	// Parse aggregates until 'on' (each can have default=value)
 	for p.tok != token.ON && p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
-		expr := p.parseNamedExprSingle()
-		op.Aggregates = append(op.Aggregates, expr)
+		agg := &ast.MakeSeriesAggregation{
+			Expr: p.parseNamedExprSingle(),
+		}
+
+		// Check for optional 'default = value'
+		if p.tok == token.DEFAULT {
+			agg.DefaultPos = p.pos
+			p.next()
+			p.expect(token.ASSIGN)
+			agg.Default = p.parseExprNoPipe()
+		}
+
+		op.Aggregates = append(op.Aggregates, agg)
 		if !p.accept(token.COMMA) {
 			break
 		}
@@ -855,7 +1004,28 @@ func (p *Parser) parseMakeSeriesOp(pipePos token.Pos) *ast.MakeSeriesOp {
 		op.OnColumn = p.parseExprNoPipe()
 	}
 
-	// Parse optional 'in range(...)' - simplified parsing
+	// Parse optional 'from datetime(...)'
+	if p.tok == token.FROM {
+		op.FromPos = p.pos
+		p.next()
+		op.From = p.parseExprNoPipe()
+	}
+
+	// Parse optional 'to datetime(...)'
+	if p.tok == token.TO {
+		op.ToPos = p.pos
+		p.next()
+		op.To = p.parseExprNoPipe()
+	}
+
+	// Parse 'step interval'
+	if p.tok == token.STEP {
+		op.StepPos = p.pos
+		p.next()
+		op.Step = p.parseExprNoPipe()
+	}
+
+	// Parse optional 'in range(...)' - legacy syntax
 	if p.tok == token.IN {
 		inPos := p.pos
 		p.next()
@@ -1196,9 +1366,53 @@ func (p *Parser) parseMvApplyOp(pipePos token.Pos) *ast.MvApplyOp {
 
 	op := &ast.MvApplyOp{Pipe: pipePos, MvApply: opPos}
 
-	// Parse items until 'on'
+	// Parse parameters
+	op.Params = p.parseOperatorParams()
+
+	// Parse optional limit
+	if p.tok == token.LIMIT {
+		op.LimitPos = p.pos
+		p.next()
+		op.Limit = p.parseLiteral()
+	}
+
+	// Parse items until 'on' (columns with optional name and type)
 	for p.tok != token.ON && p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
-		item := p.parseNamedExprSingle()
+		item := &ast.MvApplyColumn{}
+
+		// Check for named column (name = expr)
+		if p.tok == token.IDENT {
+			// Look ahead to see if there's an =
+			savedOffset := p.lex.Offset()
+			savedPos := p.pos
+			savedTok := p.tok
+			savedLit := p.lit
+
+			name := p.parseIdent()
+			if p.tok == token.ASSIGN {
+				item.Name = name
+				item.Assign = p.pos
+				p.next() // consume '='
+				item.Expr = p.parseUnaryExpr()
+			} else {
+				// Not a named column, restore and parse as expression
+				p.lex.Reset(savedOffset)
+				p.pos = savedPos
+				p.tok = savedTok
+				p.lit = savedLit
+				item.Expr = p.parseUnaryExpr()
+			}
+		} else {
+			item.Expr = p.parseUnaryExpr()
+		}
+
+		// Check for 'to typeof(type)'
+		if p.tok == token.TO {
+			item.ToPos = p.pos
+			p.next()
+			item.Type = p.parseUnaryExpr() // typeof(long)
+		}
+
 		op.Items = append(op.Items, item)
 		if !p.accept(token.COMMA) {
 			break
@@ -1213,11 +1427,8 @@ func (p *Parser) parseMvApplyOp(pipePos token.Pos) *ast.MvApplyOp {
 		// Expect '('
 		if p.tok == token.LPAREN {
 			p.next()
-			// Parse inner query
-			expr := p.parseExpr()
-			if pipe, ok := expr.(*ast.PipeExpr); ok {
-				op.OnExpr = pipe
-			}
+			// Parse inner query as a contextual subexpression (pipe expression)
+			op.OnExpr = p.parseContextualSubExpr()
 			p.expect(token.RPAREN)
 		}
 	}

@@ -59,10 +59,33 @@ T | make-series count() on TimeGenerated step 1h
 
 T | make-series avg(V) on T from datetime(2023-01-01) to datetime(2023-02-01) step 1h
 
+T | make-series count() default=0 on Time step 1h
+
+T | make-series avg(Val) default=0, sum(Val) default=0 on Time from datetime(2023-01-01) to datetime(2023-12-31) step 1d by Category
+
 // mv-expand
 T | mv-expand Col
 
 T | mv-expand Col1, Col2
+
+T | mv-expand Col to typeof(long)
+
+T | mv-expand with_itemindex=idx Col
+
+T | mv-expand limit 100 Col
+
+T | mv-expand x = Items
+
+// mv-apply
+T | mv-apply x on (x > 10)
+
+T | mv-apply x = Items on (summarize count())
+
+T | mv-apply x = Items to typeof(long) on (where x > 0)
+
+T | mv-apply limit 100 Items on (extend Val = Items * 2)
+
+T | mv-apply x = A, y = B on (where x > y)
 
 // parse
 T | parse Text with * "key=" Key

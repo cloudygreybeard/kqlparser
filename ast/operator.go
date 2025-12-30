@@ -222,10 +222,10 @@ func (x *UnionOp) End() token.Pos {
 
 // RenderOp represents a render operator.
 type RenderOp struct {
-	Pipe       token.Pos       // Position of "|"
-	Render     token.Pos       // Position of "render"
-	ChartType  *Ident          // Chart type (table, piechart, barchart, etc.)
-	WithPos    token.Pos       // Position of "with" (NoPos if no properties)
+	Pipe       token.Pos         // Position of "|"
+	Render     token.Pos         // Position of "render"
+	ChartType  *Ident            // Chart type (table, piechart, barchart, etc.)
+	WithPos    token.Pos         // Position of "with" (NoPos if no properties)
 	Properties []*RenderProperty // Render properties (title, xcolumn, etc.)
 }
 
@@ -246,8 +246,8 @@ func (x *RenderOp) End() token.Pos {
 
 // ParseColumn represents a column capture in a parse pattern (e.g., Key:string).
 type ParseColumn struct {
-	Name *Ident    // Column name
-	Type *Ident    // Optional type annotation (e.g., "string", "long")
+	Name *Ident // Column name
+	Type *Ident // Optional type annotation (e.g., "string", "long")
 }
 
 func (x *ParseColumn) Pos() token.Pos { return x.Name.Pos() }
@@ -261,22 +261,22 @@ func (x *ParseColumn) expr() {}
 
 // ParsePatternSegment represents a segment in a parse pattern.
 type ParsePatternSegment struct {
-	Star   bool        // Whether preceded by *
-	Text   Expr        // String literal delimiter
+	Star   bool         // Whether preceded by *
+	Text   Expr         // String literal delimiter
 	Column *ParseColumn // Optional column capture after delimiter
 }
 
 // ParseOp represents a parse operator.
 type ParseOp struct {
-	Pipe         token.Pos             // Position of "|"
-	Parse        token.Pos             // Position of "parse"
-	Kind         string                // Parse kind: "", "simple", "regex", "relaxed"
-	Source       Expr                  // Source expression to parse
-	WithPos      token.Pos             // Position of "with"
-	LeadingCol   *ParseColumn          // Optional leading column before any delimiter
+	Pipe         token.Pos              // Position of "|"
+	Parse        token.Pos              // Position of "parse"
+	Kind         string                 // Parse kind: "", "simple", "regex", "relaxed"
+	Source       Expr                   // Source expression to parse
+	WithPos      token.Pos              // Position of "with"
+	LeadingCol   *ParseColumn           // Optional leading column before any delimiter
 	Segments     []*ParsePatternSegment // Pattern segments
-	TrailingStar bool                  // Whether pattern ends with *
-	Pattern      Expr                  // Legacy: simple parse pattern (for backward compat)
+	TrailingStar bool                   // Whether pattern ends with *
+	Pattern      Expr                   // Legacy: simple parse pattern (for backward compat)
 }
 
 func (x *ParseOp) Pos() token.Pos { return x.Pipe }
@@ -332,17 +332,47 @@ func (x *ParseKvOp) End() token.Pos {
 }
 
 // MvExpandOp represents an mv-expand operator.
+// MvExpandColumn represents a column in mv-expand with optional name and type.
+type MvExpandColumn struct {
+	Name   *Ident    // Optional name for the expanded column
+	Assign token.Pos // Position of "=" (NoPos if unnamed)
+	Expr   Expr      // Column expression to expand
+	ToPos  token.Pos // Position of "to" (NoPos if no type)
+	Type   Expr      // Type annotation (nil if none)
+}
+
+func (x *MvExpandColumn) Pos() token.Pos {
+	if x.Name != nil {
+		return x.Name.Pos()
+	}
+	return x.Expr.Pos()
+}
+
+func (x *MvExpandColumn) End() token.Pos {
+	if x.Type != nil {
+		return x.Type.End()
+	}
+	return x.Expr.End()
+}
+
 type MvExpandOp struct {
-	Pipe     token.Pos // Position of "|"
-	MvExpand token.Pos // Position of "mv-expand"
-	Columns  []Expr    // Columns to expand
+	Pipe          token.Pos          // Position of "|"
+	MvExpand      token.Pos          // Position of "mv-expand"
+	Params        []*OperatorParam   // Parameters (bagexpansion, with_itemindex)
+	LimitPos      token.Pos          // Position of "limit" (NoPos if none)
+	Limit         Expr               // Limit expression (nil if none)
+	Columns       []*MvExpandColumn  // Columns to expand
 }
 
 func (x *MvExpandOp) Pos() token.Pos { return x.Pipe }
 
 func (x *MvExpandOp) End() token.Pos {
 	if len(x.Columns) > 0 {
-		return x.Columns[len(x.Columns)-1].End()
+		last := x.Columns[len(x.Columns)-1]
+		if last.Type != nil {
+			return last.Type.End()
+		}
+		return last.Expr.End()
 	}
 	return x.MvExpand + 9 // len("mv-expand")
 }
@@ -441,15 +471,28 @@ func (x *LookupOp) End() token.Pos {
 }
 
 // MakeSeriesOp represents a make-series operator.
+// MakeSeriesAggregation represents an aggregation with optional default value.
+type MakeSeriesAggregation struct {
+	Expr       *NamedExpr // The aggregation expression (e.g., count(), avg(Value))
+	DefaultPos token.Pos  // Position of "default" (NoPos if none)
+	Default    Expr       // Default value for missing bins (nil if none)
+}
+
 type MakeSeriesOp struct {
-	Pipe       token.Pos    // Position of "|"
-	MakeSeries token.Pos    // Position of "make-series"
-	Aggregates []*NamedExpr // Aggregations (e.g., count())
-	OnPos      token.Pos    // Position of "on"
-	OnColumn   Expr         // Time column
-	InRange    *InRangeExpr // Optional in range(start, stop, step)
-	ByPos      token.Pos    // Position of "by" (NoPos if none)
-	GroupBy    []*NamedExpr // Group by expressions
+	Pipe       token.Pos                // Position of "|"
+	MakeSeries token.Pos                // Position of "make-series"
+	Aggregates []*MakeSeriesAggregation // Aggregations with optional defaults
+	OnPos      token.Pos                // Position of "on"
+	OnColumn   Expr                     // Time column
+	FromPos    token.Pos                // Position of "from" (NoPos if none)
+	From       Expr                     // Start time (nil if none)
+	ToPos      token.Pos                // Position of "to" (NoPos if none)
+	To         Expr                     // End time (nil if none)
+	StepPos    token.Pos                // Position of "step"
+	Step       Expr                     // Step interval
+	InRange    *InRangeExpr             // Optional in range(start, stop, step) - legacy
+	ByPos      token.Pos                // Position of "by" (NoPos if none)
+	GroupBy    []*NamedExpr             // Group by expressions
 }
 
 func (x *MakeSeriesOp) Pos() token.Pos { return x.Pipe }
@@ -627,8 +670,8 @@ func (x *ProjectKeepOp) End() token.Pos {
 
 // TopNestedOp represents a top-nested operator.
 type TopNestedOp struct {
-	Pipe      token.Pos      // Position of "|"
-	TopNested token.Pos      // Position of "top-nested"
+	Pipe      token.Pos // Position of "|"
+	TopNested token.Pos // Position of "top-nested"
 	Clauses   []*TopNestedClause
 	EndPos    token.Pos
 }
@@ -675,17 +718,51 @@ func (x *TopHittersOp) End() token.Pos {
 	return x.Column.End()
 }
 
+// MvApplyColumn represents a column in mv-apply with optional name and type.
+type MvApplyColumn struct {
+	Name   *Ident    // Optional name for the column
+	Assign token.Pos // Position of "=" (NoPos if unnamed)
+	Expr   Expr      // Column expression
+	ToPos  token.Pos // Position of "to" (NoPos if no type)
+	Type   Expr      // Type annotation (nil if none)
+}
+
+func (x *MvApplyColumn) Pos() token.Pos {
+	if x.Name != nil {
+		return x.Name.Pos()
+	}
+	return x.Expr.Pos()
+}
+
+func (x *MvApplyColumn) End() token.Pos {
+	if x.Type != nil {
+		return x.Type.End()
+	}
+	return x.Expr.End()
+}
+
 // MvApplyOp represents an mv-apply operator.
 type MvApplyOp struct {
-	Pipe    token.Pos    // Position of "|"
-	MvApply token.Pos    // Position of "mv-apply"
-	Items   []*NamedExpr // Items to apply (name = expr or just expr)
-	OnPos   token.Pos    // Position of "on"
-	OnExpr  *PipeExpr    // Subquery to apply
+	Pipe     token.Pos        // Position of "|"
+	MvApply  token.Pos        // Position of "mv-apply"
+	Params   []*OperatorParam // Parameters (context_id, id_column)
+	LimitPos token.Pos        // Position of "limit" (NoPos if none)
+	Limit    Expr             // Limit expression (nil if none)
+	Items    []*MvApplyColumn // Items to apply
+	OnPos    token.Pos        // Position of "on"
+	OnExpr   *PipeExpr        // Subquery to apply
 }
 
 func (x *MvApplyOp) Pos() token.Pos { return x.Pipe }
-func (x *MvApplyOp) End() token.Pos { return x.OnExpr.End() }
+func (x *MvApplyOp) End() token.Pos {
+	if x.OnExpr != nil {
+		return x.OnExpr.End()
+	}
+	if len(x.Items) > 0 {
+		return x.Items[len(x.Items)-1].End()
+	}
+	return x.MvApply + 8 // len("mv-apply")
+}
 
 // FindOp represents a find operator.
 type FindOp struct {
