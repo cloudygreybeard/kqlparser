@@ -5,6 +5,9 @@ let name = "test"
 
 let dt = datetime(2023-01-01)
 
+// Let with materialize
+let cached = materialize(T | where x > 10 | project a, b)
+
 // Set Statement
 set notruncation
 

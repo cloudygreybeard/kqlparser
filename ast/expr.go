@@ -194,3 +194,15 @@ type ToTableExpr struct {
 
 func (x *ToTableExpr) Pos() token.Pos { return x.ToTable }
 func (x *ToTableExpr) End() token.Pos { return x.Rparen + 1 }
+
+// MaterializeExpr represents a materialize expression that caches a tabular result.
+// Syntax: materialize(pipe_expression)
+type MaterializeExpr struct {
+	Materialize token.Pos // Position of "materialize"
+	Lparen      token.Pos // Position of "("
+	Query       Expr      // The pipe expression inside (usually a PipeExpr)
+	Rparen      token.Pos // Position of ")"
+}
+
+func (x *MaterializeExpr) Pos() token.Pos { return x.Materialize }
+func (x *MaterializeExpr) End() token.Pos { return x.Rparen + 1 }

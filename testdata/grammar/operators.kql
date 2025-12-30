@@ -110,6 +110,12 @@ T | render table
 
 T | render barchart
 
+T | render timechart with (title="My Chart")
+
+T | render piechart with (title="Distribution", legend=visible)
+
+T | render linechart with (title="Trends", xcolumn=Date, ycolumns=Value, kind=stacked)
+
 // sample
 T | sample 100
 

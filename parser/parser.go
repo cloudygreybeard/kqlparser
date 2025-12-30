@@ -632,6 +632,9 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 	case token.TOTABLE:
 		return p.parseToTableExpr()
 
+	case token.MATERIALIZE:
+		return p.parseMaterializeExpr()
+
 	// Handle keywords that can be used as identifiers in certain contexts
 	case token.COUNT:
 		return p.parseIdent()
@@ -800,6 +803,24 @@ func (p *Parser) parseToTableExpr() *ast.ToTableExpr {
 		p.parseIdent()
 		expr.NoOptimize = true
 	}
+
+	expr.Lparen = p.expect(token.LPAREN)
+
+	// Parse the inner expression as a full pipe expression
+	expr.Query = p.parseExpr()
+
+	expr.Rparen = p.expect(token.RPAREN)
+
+	return expr
+}
+
+// parseMaterializeExpr parses a materialize expression.
+// Syntax: materialize(pipe_expression)
+func (p *Parser) parseMaterializeExpr() *ast.MaterializeExpr {
+	pos := p.pos
+	p.next() // consume 'materialize'
+
+	expr := &ast.MaterializeExpr{Materialize: pos}
 
 	expr.Lparen = p.expect(token.LPAREN)
 

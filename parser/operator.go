@@ -498,9 +498,36 @@ func (p *Parser) parseRenderOp(pipePos token.Pos) *ast.RenderOp {
 
 	chartType := p.parseIdent()
 
-	// TODO: parse with clause
+	op := &ast.RenderOp{Pipe: pipePos, Render: renderPos, ChartType: chartType}
 
-	return &ast.RenderOp{Pipe: pipePos, Render: renderPos, ChartType: chartType}
+	// Parse with clause if present
+	if p.tok == token.WITH {
+		op.WithPos = p.pos
+		p.next() // consume 'with'
+
+		p.expect(token.LPAREN)
+
+		// Parse properties: name = value, name = value, ...
+		for p.tok != token.RPAREN && p.tok != token.EOF {
+			prop := &ast.RenderProperty{
+				Name: p.parseIdent(),
+			}
+			prop.Assign = p.expect(token.ASSIGN)
+
+			// Parse value (can be identifier, string, number, or list)
+			prop.Value = p.parseExprNoPipe()
+
+			op.Properties = append(op.Properties, prop)
+
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+
+		p.expect(token.RPAREN)
+	}
+
+	return op
 }
 
 // parseParseOp parses a parse operator.

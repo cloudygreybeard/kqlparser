@@ -155,7 +155,7 @@ func TestSpecificGrammarPatterns(t *testing.T) {
 		{"timespan_minutes", "print 5min", false},
 		{"timespan_hours", "print 2hr", false},
 		{"string_verbatim", `print @"no\escape"`, false},
-		{"string_multiline", "print ```multi\nline```", false},                      // multi-line strings now supported
+		{"string_multiline", "print ```multi\nline```", false},                     // multi-line strings now supported
 		{"guid_literal", "print guid(12345678-1234-1234-1234-123456789abc)", true}, // TODO: not yet supported
 
 		// Operators

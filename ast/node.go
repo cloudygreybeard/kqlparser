@@ -48,6 +48,7 @@ func (*NamedExpr) node()        {}
 func (*PipeExpr) node()         {}
 func (*ToScalarExpr) node()     {}
 func (*ToTableExpr) node()      {}
+func (*MaterializeExpr) node()  {}
 func (*LetStmt) node()          {}
 func (*ExprStmt) node()         {}
 func (*QueryStmt) node()        {}
@@ -113,8 +114,9 @@ func (*DynamicLit) expr()   {}
 func (*StarExpr) expr()     {}
 func (*NamedExpr) expr()    {}
 func (*PipeExpr) expr()     {}
-func (*ToScalarExpr) expr() {}
-func (*ToTableExpr) expr()  {}
+func (*ToScalarExpr) expr()    {}
+func (*ToTableExpr) expr()     {}
+func (*MaterializeExpr) expr() {}
 
 // Statement nodes implement Stmt
 func (*LetStmt) stmt()       {}

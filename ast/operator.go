@@ -222,14 +222,27 @@ func (x *UnionOp) End() token.Pos {
 
 // RenderOp represents a render operator.
 type RenderOp struct {
-	Pipe      token.Pos // Position of "|"
-	Render    token.Pos // Position of "render"
-	ChartType *Ident    // Chart type (table, piechart, barchart, etc.)
-	// TODO: with clause properties
+	Pipe       token.Pos       // Position of "|"
+	Render     token.Pos       // Position of "render"
+	ChartType  *Ident          // Chart type (table, piechart, barchart, etc.)
+	WithPos    token.Pos       // Position of "with" (NoPos if no properties)
+	Properties []*RenderProperty // Render properties (title, xcolumn, etc.)
+}
+
+// RenderProperty represents a property in a render with clause.
+type RenderProperty struct {
+	Name   *Ident    // Property name (title, xcolumn, series, kind, etc.)
+	Assign token.Pos // Position of "="
+	Value  Expr      // Property value (string, identifier, or list)
 }
 
 func (x *RenderOp) Pos() token.Pos { return x.Pipe }
-func (x *RenderOp) End() token.Pos { return x.ChartType.End() }
+func (x *RenderOp) End() token.Pos {
+	if len(x.Properties) > 0 {
+		return x.Properties[len(x.Properties)-1].Value.End()
+	}
+	return x.ChartType.End()
+}
 
 // ParseColumn represents a column capture in a parse pattern (e.g., Key:string).
 type ParseColumn struct {
