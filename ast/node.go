@@ -93,6 +93,9 @@ func (*MvApplyOp) node()             {}
 func (*MvApplyColumn) node()         {}
 func (*MvExpandColumn) node()        {}
 func (*FindOp) node()                {}
+func (*FindColumn) node()            {}
+func (*ScanStep) node()              {}
+func (*ScanAssign) node()            {}
 func (*MakeGraphOp) node()           {}
 func (*MakeGraphWith) node()         {}
 func (*GraphMatchOp) node()          {}

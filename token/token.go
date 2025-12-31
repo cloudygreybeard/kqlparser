@@ -110,6 +110,7 @@ const (
 	PROJECTKEEP
 	PROJECTRENAME
 	PROJECTREORDER
+	PROJECTSMART
 	RANGE
 	REDUCE
 	RENDER
@@ -328,6 +329,7 @@ var tokenStrings = [...]string{
 	PROJECTKEEP:         "project-keep",
 	PROJECTRENAME:       "project-rename",
 	PROJECTREORDER:      "project-reorder",
+	PROJECTSMART:        "project-smart",
 	RANGE:               "range",
 	REDUCE:              "reduce",
 	RENDER:              "render",

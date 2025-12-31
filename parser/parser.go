@@ -162,6 +162,9 @@ func (p *Parser) parseStmt() ast.Stmt {
 		return p.parseDatatableStmt()
 	case token.EXTERNALDATA:
 		return p.parseExternalDataStmt()
+	case token.FIND:
+		// find is a special standalone operator that can start a query
+		return p.parseFindStmt()
 	default:
 		// Expression statement (query)
 		expr := p.parseExpr()
@@ -170,6 +173,26 @@ func (p *Parser) parseStmt() ast.Stmt {
 		}
 		return &ast.ExprStmt{X: expr}
 	}
+}
+
+// parseFindStmt parses a find statement as a query.
+func (p *Parser) parseFindStmt() ast.Stmt {
+	findOp := p.parseFindOp(token.NoPos)
+
+	// Wrap in a PipeExpr
+	pipe := &ast.PipeExpr{
+		Operators: []ast.Operator{findOp},
+	}
+
+	// Parse any additional piped operators
+	for p.tok == token.PIPE {
+		op := p.parseOperator()
+		if op != nil {
+			pipe.Operators = append(pipe.Operators, op)
+		}
+	}
+
+	return &ast.ExprStmt{X: pipe}
 }
 
 // parseLetStmt parses a let statement.

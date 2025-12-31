@@ -529,8 +529,24 @@ func (b *Binder) bindInvokeOp(op *ast.InvokeOp, inputType types.Type) types.Type
 
 // bindScanOp binds a scan operator.
 func (b *Binder) bindScanOp(op *ast.ScanOp, inputType types.Type) types.Type {
+	// Bind order by expressions
+	for _, ord := range op.OrderBy {
+		b.bindExpr(ord.Expr)
+	}
+	// Bind partition by expressions
+	for _, expr := range op.PartitionBy {
+		b.bindExpr(expr)
+	}
+	// Bind step conditions and assignments
 	for _, step := range op.Steps {
-		b.bindExpr(step)
+		if step.Condition != nil {
+			b.bindExpr(step.Condition)
+		}
+		for _, assign := range step.Assigns {
+			if assign.Value != nil {
+				b.bindExpr(assign.Value)
+			}
+		}
 	}
 	// Scan is complex - typically preserves schema with added state columns
 	return inputType
@@ -676,9 +692,11 @@ func (b *Binder) bindFindOp(op *ast.FindOp, inputType types.Type) types.Type {
 	if op.Predicate != nil {
 		b.bindExpr(op.Predicate)
 	}
-	// Bind projected columns
+	// Bind projected columns (FindColumn is not an Expr, just extract names)
 	for _, col := range op.Columns {
-		b.bindExpr(col)
+		if col.Name != nil {
+			b.bindExpr(col.Name)
+		}
 	}
 	// find returns source_, pack_ and any projected columns
 	cols := []*types.Column{
@@ -731,13 +749,17 @@ func (b *Binder) bindParseKvOp(op *ast.ParseKvOp, inputType types.Type) types.Ty
 	if op.Source != nil {
 		b.bindExpr(op.Source)
 	}
-	// Bind column expressions
-	for _, col := range op.Columns {
-		b.bindExpr(col)
+	// Bind key expressions (ColumnDeclExpr names)
+	for _, key := range op.Keys {
+		if key.Name != nil {
+			b.bindExpr(key.Name)
+		}
 	}
-	// Bind option expressions
+	// Bind option values
 	for _, opt := range op.Options {
-		b.bindExpr(opt)
+		if opt.Value != nil {
+			b.bindExpr(opt.Value)
+		}
 	}
 	// parse-kv adds columns for each key-value pair extracted
 	// Return input type (actual columns depend on data)

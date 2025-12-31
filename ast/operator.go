@@ -309,24 +309,29 @@ func (x *ParseWhereOp) Pos() token.Pos { return x.Pipe }
 func (x *ParseWhereOp) End() token.Pos { return x.Pattern.End() }
 
 // ParseKvOp represents a parse-kv operator.
+// Syntax: parse-kv Expr (Col: type, ...) [with (options)]
 type ParseKvOp struct {
-	Pipe    token.Pos // Position of "|"
-	ParseKv token.Pos // Position of "parse-kv"
-	Source  Expr      // Source column
-	AsPos   token.Pos // Position of "as" (optional)
-	Columns []Expr    // Output columns (optional)
-	WithPos token.Pos // Position of "with" (optional)
-	Options []Expr    // Options (optional)
+	Pipe      token.Pos         // Position of "|"
+	ParseKv   token.Pos         // Position of "parse-kv"
+	Source    Expr              // Source column
+	AsPos     token.Pos         // Position of "as" (optional, for backwards compat)
+	Lparen    token.Pos         // Position of "(" for schema
+	Keys      []*ColumnDeclExpr // Key schema: (A: string, B: long)
+	Rparen    token.Pos         // Position of ")" for schema
+	WithPos   token.Pos         // Position of "with" (optional)
+	WithOpen  token.Pos         // Position of "(" for with clause
+	Options   []*OperatorParam  // Options like pair_delimiter, kv_delimiter
+	WithClose token.Pos         // Position of ")" for with clause
 }
 
 func (x *ParseKvOp) Pos() token.Pos { return x.Pipe }
 
 func (x *ParseKvOp) End() token.Pos {
-	if len(x.Options) > 0 {
-		return x.Options[len(x.Options)-1].End()
+	if x.WithClose != token.NoPos {
+		return x.WithClose + 1
 	}
-	if len(x.Columns) > 0 {
-		return x.Columns[len(x.Columns)-1].End()
+	if x.Rparen != token.NoPos {
+		return x.Rparen + 1
 	}
 	return x.Source.End()
 }
@@ -583,16 +588,58 @@ func (x *InvokeOp) Pos() token.Pos { return x.Pipe }
 func (x *InvokeOp) End() token.Pos { return x.Function.End() }
 
 // ScanOp represents a scan operator.
+// Syntax: scan [params] [order by ...] [partition by ...] [declare (...)] with (steps)
 type ScanOp struct {
-	Pipe   token.Pos // Position of "|"
-	Scan   token.Pos // Position of "scan"
-	With   token.Pos // Position of "with"
-	Steps  []Expr    // Scan steps
-	EndPos token.Pos
+	Pipe         token.Pos         // Position of "|"
+	Scan         token.Pos         // Position of "scan"
+	Params       []*OperatorParam  // Optional parameters
+	OrderByPos   token.Pos         // Position of "order by" (optional)
+	OrderBy      []*OrderExpr       // Order by expressions
+	PartitionPos token.Pos         // Position of "partition by" (optional)
+	PartitionBy  []Expr            // Partition by expressions
+	DeclarePos   token.Pos         // Position of "declare" (optional)
+	Declare      []*ColumnDeclExpr // Declared variables
+	With         token.Pos         // Position of "with"
+	Lparen       token.Pos         // Position of "("
+	Steps        []*ScanStep       // Scan steps
+	Rparen       token.Pos         // Position of ")"
 }
 
 func (x *ScanOp) Pos() token.Pos { return x.Pipe }
-func (x *ScanOp) End() token.Pos { return x.EndPos }
+func (x *ScanOp) End() token.Pos { return x.Rparen + 1 }
+
+// ScanStep represents a step in a scan operator.
+// Syntax: step Name [optional] [output=...] : Expr [=> assignments];
+type ScanStep struct {
+	StepPos    token.Pos     // Position of "step"
+	Name       *Ident        // Step name
+	Optional   bool          // Is optional
+	OutputPos  token.Pos     // Position of "output" (optional)
+	OutputKind string        // Output kind: "all", "last", "none"
+	Colon      token.Pos     // Position of ":"
+	Condition  Expr          // Step condition
+	Arrow      token.Pos     // Position of "=>" (optional)
+	Assigns    []*ScanAssign // Assignments
+}
+
+func (x *ScanStep) Pos() token.Pos { return x.StepPos }
+func (x *ScanStep) End() token.Pos {
+	if len(x.Assigns) > 0 {
+		return x.Assigns[len(x.Assigns)-1].End()
+	}
+	return x.Condition.End()
+}
+
+// ScanAssign represents an assignment in a scan step.
+// Syntax: Name = Expr
+type ScanAssign struct {
+	Name   *Ident    // Variable name
+	Assign token.Pos // Position of "="
+	Value  Expr      // Value expression
+}
+
+func (x *ScanAssign) Pos() token.Pos { return x.Name.Pos() }
+func (x *ScanAssign) End() token.Pos { return x.Value.End() }
 
 // EvaluateOp represents an evaluate operator (plugin invocation).
 type EvaluateOp struct {
@@ -780,23 +827,51 @@ func (x *MvApplyOp) End() token.Pos {
 
 // FindOp represents a find operator.
 type FindOp struct {
-	Pipe       token.Pos // Position of "|"
-	Find       token.Pos // Position of "find"
-	InPos      token.Pos // Position of "in" (optional)
-	Tables     []Expr    // Tables to search (optional)
-	WherePos   token.Pos // Position of "where"
-	Predicate  Expr      // Search predicate
-	ProjectPos token.Pos // Position of "project" (optional)
-	Columns    []Expr    // Projected columns (optional)
+	Pipe            token.Pos        // Position of "|"
+	Find            token.Pos        // Position of "find"
+	DataScope       *Ident           // Optional data scope (datascope=...)
+	Params          []*OperatorParam // Optional parameters
+	InPos           token.Pos        // Position of "in" (optional)
+	Tables          []Expr           // Tables to search (optional)
+	WherePos        token.Pos        // Position of "where"
+	Predicate       Expr             // Search predicate
+	ProjectPos      token.Pos        // Position of "project" (optional)
+	Columns         []*FindColumn    // Projected columns (optional)
+	ProjectSmart    bool             // "project-smart" instead of project
+	ProjectAwayPos  token.Pos        // Position of "project-away" (optional)
+	ProjectAway     []*FindColumn    // Columns to remove (optional)
+	ProjectAwayStar bool             // project-away *
 }
 
 func (x *FindOp) Pos() token.Pos { return x.Pipe }
 
 func (x *FindOp) End() token.Pos {
+	if len(x.ProjectAway) > 0 {
+		return x.ProjectAway[len(x.ProjectAway)-1].End()
+	}
 	if len(x.Columns) > 0 {
 		return x.Columns[len(x.Columns)-1].End()
 	}
-	return x.Predicate.End()
+	if x.Predicate != nil {
+		return x.Predicate.End()
+	}
+	return x.Find + 4 // len("find")
+}
+
+// FindColumn represents a column in find operator project clause.
+type FindColumn struct {
+	Name  *Ident    // Column name
+	Colon token.Pos // Position of ":" (optional)
+	Type  *Ident    // Optional type
+	Pack  bool      // Is pack(*)
+}
+
+func (x *FindColumn) Pos() token.Pos { return x.Name.Pos() }
+func (x *FindColumn) End() token.Pos {
+	if x.Type != nil {
+		return x.Type.End()
+	}
+	return x.Name.End()
 }
 
 // PrintStmt represents a print statement (not a pipe operator).

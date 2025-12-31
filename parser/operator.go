@@ -1110,31 +1110,164 @@ func (p *Parser) parseMakeSeriesOp(pipePos token.Pos) *ast.MakeSeriesOp {
 }
 
 // parseScanOp parses a scan operator.
+// Syntax: scan [params] [order by ...] [partition by ...] [declare (...)] with (steps)
 func (p *Parser) parseScanOp(pipePos token.Pos) *ast.ScanOp {
 	opPos := p.pos
 	p.next() // consume 'scan'
 
 	op := &ast.ScanOp{Pipe: pipePos, Scan: opPos}
 
-	// Scan has complex syntax with 'with' and steps - simplified for now
+	// Parse optional parameters
+	op.Params = p.parseOperatorParams()
+
+	// Parse optional 'order by' clause
+	if p.tok == token.ORDER {
+		op.OrderByPos = p.pos
+		p.next() // consume 'order'
+		p.expect(token.BY)
+		for {
+			expr := p.parseExprNoPipe()
+			ordered := &ast.OrderExpr{Expr: expr}
+			if p.tok == token.ASC {
+				ordered.Order = token.ASC
+				p.next()
+			} else if p.tok == token.DESC {
+				ordered.Order = token.DESC
+				p.next()
+			}
+			if p.tok == token.NULLS {
+				p.next() // consume 'nulls'
+				if p.tok == token.IDENT && p.lit == "first" {
+					ordered.Nulls = token.IDENT // Mark as "first"
+					p.next()
+				} else if p.tok == token.IDENT && p.lit == "last" {
+					ordered.Nulls = token.IDENT // Mark as "last"
+					p.next()
+				}
+			}
+			op.OrderBy = append(op.OrderBy, ordered)
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+	}
+
+	// Parse optional 'partition by' clause
+	if p.tok == token.PARTITION {
+		op.PartitionPos = p.pos
+		p.next() // consume 'partition'
+		p.expect(token.BY)
+		for {
+			expr := p.parseExprNoPipe()
+			op.PartitionBy = append(op.PartitionBy, expr)
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+	}
+
+	// Parse optional 'declare' clause
+	if p.tok == token.DECLARE {
+		op.DeclarePos = p.pos
+		p.next() // consume 'declare'
+		if p.tok == token.LPAREN {
+			p.next()
+			for p.tok != token.RPAREN && p.tok != token.EOF {
+				col := &ast.ColumnDeclExpr{Name: p.parseIdent()}
+				if p.tok == token.COLON {
+					col.Colon = p.pos
+					p.next()
+					col.Type = p.parseIdent()
+				}
+				op.Declare = append(op.Declare, col)
+				if !p.accept(token.COMMA) {
+					break
+				}
+			}
+			p.expect(token.RPAREN)
+		}
+	}
+
+	// Parse 'with (steps)'
 	if p.tok == token.WITH {
 		op.With = p.pos
 		p.next()
 	}
 
-	// Parse content until next pipe
-	for p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
-		expr := p.parseExpr()
-		if expr != nil {
-			op.Steps = append(op.Steps, expr)
+	if p.tok == token.LPAREN {
+		op.Lparen = p.pos
+		p.next()
+
+		// Parse steps
+		for p.tok != token.RPAREN && p.tok != token.EOF {
+			step := p.parseScanStep()
+			if step != nil {
+				op.Steps = append(op.Steps, step)
+			}
 		}
-		if !p.accept(token.COMMA) {
-			break
+
+		op.Rparen = p.pos
+		p.expect(token.RPAREN)
+	}
+
+	return op
+}
+
+// parseScanStep parses a single step in a scan operator.
+// Syntax: step Name [optional] [output=...] : Expr [=> assignments];
+func (p *Parser) parseScanStep() *ast.ScanStep {
+	if p.tok != token.STEP {
+		p.errorf(p.pos, "expected 'step', got %s", p.tok)
+		return nil
+	}
+
+	step := &ast.ScanStep{StepPos: p.pos}
+	p.next() // consume 'step'
+
+	// Parse step name
+	step.Name = p.parseIdent()
+
+	// Check for 'optional'
+	if p.tok == token.IDENT && p.lit == "optional" {
+		step.Optional = true
+		p.next()
+	}
+
+	// Check for 'output = ...'
+	if p.tok == token.IDENT && p.lit == "output" {
+		step.OutputPos = p.pos
+		p.next()
+		p.expect(token.ASSIGN)
+		if p.tok == token.IDENT || p.tok.IsKeyword() {
+			step.OutputKind = p.lit
+			p.next()
 		}
 	}
 
-	op.EndPos = p.pos
-	return op
+	// Parse ':' and condition
+	step.Colon = p.expect(token.COLON)
+	step.Condition = p.parseExprNoPipe()
+
+	// Parse optional '=>' and assignments
+	if p.tok == token.ARROW {
+		step.Arrow = p.pos
+		p.next()
+		for {
+			assign := &ast.ScanAssign{}
+			assign.Name = p.parseIdent()
+			assign.Assign = p.expect(token.ASSIGN)
+			assign.Value = p.parseExprNoPipe()
+			step.Assigns = append(step.Assigns, assign)
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+	}
+
+	// Consume ';' at end of step
+	p.accept(token.SEMI)
+
+	return step
 }
 
 // parseConsumeOp parses a consume operator.
@@ -1549,11 +1682,15 @@ func (p *Parser) parseMvApplyOp(pipePos token.Pos) *ast.MvApplyOp {
 }
 
 // parseFindOp parses a find operator.
+// Syntax: find [datascope] [params] [in (tables)] where expr [project cols] [project-smart] [project-away cols]
 func (p *Parser) parseFindOp(pipePos token.Pos) *ast.FindOp {
 	opPos := p.pos
 	p.next() // consume 'find'
 
 	op := &ast.FindOp{Pipe: pipePos, Find: opPos}
+
+	// Parse optional parameters (including datascope)
+	op.Params = p.parseOperatorParams()
 
 	// Parse optional 'in (tables)'
 	if p.tok == token.IN {
@@ -1562,7 +1699,13 @@ func (p *Parser) parseFindOp(pipePos token.Pos) *ast.FindOp {
 		if p.tok == token.LPAREN {
 			p.next()
 			for p.tok != token.RPAREN && p.tok != token.EOF {
-				table := p.parseUnaryExpr()
+				// Parse table name, possibly with wildcard suffix
+				table := p.parseIdent()
+				// Check for wildcard suffix (*)
+				for p.tok == token.MUL {
+					table.Name = table.Name + "*"
+					p.next()
+				}
 				op.Tables = append(op.Tables, table)
 				if !p.accept(token.COMMA) {
 					break
@@ -1579,20 +1722,63 @@ func (p *Parser) parseFindOp(pipePos token.Pos) *ast.FindOp {
 		op.Predicate = p.parseExprNoPipe()
 	}
 
-	// Parse optional 'project columns'
+	// Parse optional 'project columns' or 'project-smart'
 	if p.tok == token.PROJECT {
 		op.ProjectPos = p.pos
 		p.next()
-		for p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI {
-			col := p.parseExprNoPipe()
-			op.Columns = append(op.Columns, col)
-			if !p.accept(token.COMMA) {
-				break
-			}
+		op.Columns = p.parseFindColumns()
+	} else if p.tok == token.PROJECTSMART {
+		op.ProjectPos = p.pos
+		op.ProjectSmart = true
+		p.next()
+	}
+
+	// Parse optional 'project-away columns'
+	if p.tok == token.PROJECTAWAY {
+		op.ProjectAwayPos = p.pos
+		p.next()
+		if p.tok == token.MUL {
+			op.ProjectAwayStar = true
+			p.next()
+		} else {
+			op.ProjectAway = p.parseFindColumns()
 		}
 	}
 
 	return op
+}
+
+// parseFindColumns parses find column list: col1, col2:type, pack(*)
+func (p *Parser) parseFindColumns() []*ast.FindColumn {
+	var cols []*ast.FindColumn
+	for p.tok != token.PIPE && p.tok != token.EOF && p.tok != token.SEMI && p.tok != token.PROJECTAWAY {
+		col := &ast.FindColumn{}
+
+		// Check for pack(*)
+		if p.tok == token.PACK {
+			col.Pack = true
+			col.Name = p.parseIdent()
+			if p.tok == token.LPAREN {
+				p.next()
+				p.expect(token.MUL)
+				p.expect(token.RPAREN)
+			}
+		} else {
+			col.Name = p.parseIdent()
+			// Optional :type
+			if p.tok == token.COLON {
+				col.Colon = p.pos
+				p.next()
+				col.Type = p.parseIdent()
+			}
+		}
+
+		cols = append(cols, col)
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+	return cols
 }
 
 // parseParseWhereOp parses a parse-where operator.
@@ -1614,30 +1800,40 @@ func (p *Parser) parseParseWhereOp(pipePos token.Pos) *ast.ParseWhereOp {
 }
 
 // parseParseKvOp parses a parse-kv operator.
+// Syntax: parse-kv Expr (Col: type, ...) [with (options)]
 func (p *Parser) parseParseKvOp(pipePos token.Pos) *ast.ParseKvOp {
 	opPos := p.pos
 	p.next() // consume 'parse-kv'
 
 	op := &ast.ParseKvOp{Pipe: pipePos, ParseKv: opPos}
 
-	// Parse source column
-	op.Source = p.parseExprNoPipe()
+	// Parse source expression (just identifier to avoid consuming the schema as function args)
+	op.Source = p.parseIdent()
 
-	// Parse optional 'as (columns)'
+	// Parse optional 'as' keyword (for backwards compat)
 	if p.tok == token.AS {
 		op.AsPos = p.pos
 		p.next()
-		if p.tok == token.LPAREN {
-			p.next()
-			for p.tok != token.RPAREN && p.tok != token.EOF {
-				col := p.parseExprNoPipe()
-				op.Columns = append(op.Columns, col)
-				if !p.accept(token.COMMA) {
-					break
-				}
+	}
+
+	// Parse key schema: (Col: type, ...)
+	if p.tok == token.LPAREN {
+		op.Lparen = p.pos
+		p.next()
+		for p.tok != token.RPAREN && p.tok != token.EOF {
+			col := &ast.ColumnDeclExpr{Name: p.parseIdent()}
+			if p.tok == token.COLON {
+				col.Colon = p.pos
+				p.next()
+				col.Type = p.parseIdent()
 			}
-			p.expect(token.RPAREN)
+			op.Keys = append(op.Keys, col)
+			if !p.accept(token.COMMA) {
+				break
+			}
 		}
+		op.Rparen = p.pos
+		p.expect(token.RPAREN)
 	}
 
 	// Parse optional 'with (options)'
@@ -1645,14 +1841,23 @@ func (p *Parser) parseParseKvOp(pipePos token.Pos) *ast.ParseKvOp {
 		op.WithPos = p.pos
 		p.next()
 		if p.tok == token.LPAREN {
+			op.WithOpen = p.pos
 			p.next()
 			for p.tok != token.RPAREN && p.tok != token.EOF {
-				opt := p.parseExprNoPipe()
-				op.Options = append(op.Options, opt)
+				// Parse option as name=value
+				name := p.parseIdent()
+				assignPos := p.expect(token.ASSIGN)
+				value := p.parseExprNoPipe()
+				op.Options = append(op.Options, &ast.OperatorParam{
+					Name:   name,
+					Assign: assignPos,
+					Value:  value,
+				})
 				if !p.accept(token.COMMA) {
 					break
 				}
 			}
+			op.WithClose = p.pos
 			p.expect(token.RPAREN)
 		}
 	}
