@@ -982,6 +982,9 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 	case token.MATERIALIZE:
 		return p.parseMaterializeExpr()
 
+	case token.ENTITYGROUP:
+		return p.parseEntityGroupExpr()
+
 	// Handle keywords that can be used as identifiers in certain contexts
 	case token.COUNT:
 		return p.parseIdent()
@@ -1226,6 +1229,30 @@ func (p *Parser) parseMaterializeExpr() *ast.MaterializeExpr {
 	expr.Query = p.parseExpr()
 
 	expr.Rparen = p.expect(token.RPAREN)
+
+	return expr
+}
+
+// parseEntityGroupExpr parses an entity_group expression.
+// Syntax: entity_group[expr1, expr2, ...]
+func (p *Parser) parseEntityGroupExpr() *ast.EntityGroupExpr {
+	pos := p.pos
+	p.next() // consume 'entity_group'
+
+	expr := &ast.EntityGroupExpr{EntityGroup: pos}
+
+	expr.Lbracket = p.expect(token.LBRACKET)
+
+	// Parse comma-separated list of expressions
+	for p.tok != token.RBRACKET && p.tok != token.EOF {
+		e := p.parseExpr()
+		expr.Exprs = append(expr.Exprs, e)
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	expr.Rbracket = p.expect(token.RBRACKET)
 
 	return expr
 }

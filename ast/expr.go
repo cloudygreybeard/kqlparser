@@ -280,3 +280,15 @@ type TabularTypeExpr struct {
 
 func (x *TabularTypeExpr) Pos() token.Pos { return x.Lparen }
 func (x *TabularTypeExpr) End() token.Pos { return x.Rparen + 1 }
+
+// EntityGroupExpr represents an entity_group expression.
+// Syntax: entity_group[expr1, expr2, ...]
+type EntityGroupExpr struct {
+	EntityGroup token.Pos // Position of "entity_group"
+	Lbracket    token.Pos // Position of "["
+	Exprs       []Expr    // List of expressions
+	Rbracket    token.Pos // Position of "]"
+}
+
+func (x *EntityGroupExpr) Pos() token.Pos { return x.EntityGroup }
+func (x *EntityGroupExpr) End() token.Pos { return x.Rbracket + 1 }

@@ -131,6 +131,7 @@ const (
 	// Keywords - Statements
 	ALIAS
 	DECLARE
+	ENTITYGROUP
 	LET
 	PATTERN
 	RESTRICT
@@ -350,6 +351,7 @@ var tokenStrings = [...]string{
 	DECLARE:             "declare",
 	LET:                 "let",
 	PATTERN:             "pattern",
+	ENTITYGROUP:         "entity_group",
 	RESTRICT:            "restrict",
 	SET:                 "set",
 	ACCESS:              "access",

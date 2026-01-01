@@ -102,6 +102,7 @@ func (*ViewExpr) node()              {}
 func (*TabularTypeExpr) node()       {}
 func (*DeclareStmt) node()           {}
 func (*AliasStmt) node()             {}
+func (*EntityGroupExpr) node()       {}
 func (*MakeGraphOp) node()           {}
 func (*MakeGraphWith) node()         {}
 func (*GraphMatchOp) node()          {}
@@ -150,6 +151,7 @@ func (*MaterializeExpr) expr() {}
 func (*FuncExpr) expr()        {}
 func (*ViewExpr) expr()        {}
 func (*TabularTypeExpr) expr() {}
+func (*EntityGroupExpr) expr() {}
 
 // Statement nodes implement Stmt
 func (*LetStmt) stmt()        {}
