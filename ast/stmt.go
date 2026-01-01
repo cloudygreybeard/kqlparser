@@ -60,3 +60,43 @@ func (x *Script) End() token.Pos {
 	}
 	return token.NoPos
 }
+
+// DeclareStmt represents a declare statement.
+// Syntax: declare query_parameters(...) or declare pattern name = (params) { body }
+type DeclareStmt struct {
+	Declare   token.Pos    // Position of "declare"
+	Kind      string       // "query_parameters" or "pattern"
+	KindPos   token.Pos    // Position of kind keyword
+	Name      *Ident       // Name (for pattern)
+	AssignPos token.Pos    // Position of "=" (for pattern)
+	Params    []*FuncParam // Parameters
+	Body      Expr         // Body expression (for pattern)
+}
+
+func (x *DeclareStmt) Pos() token.Pos { return x.Declare }
+func (x *DeclareStmt) End() token.Pos {
+	if x.Body != nil {
+		return x.Body.End()
+	}
+	if len(x.Params) > 0 {
+		return x.Params[len(x.Params)-1].End()
+	}
+	return x.KindPos + token.Pos(len(x.Kind))
+}
+
+// AliasStmt represents an alias database statement.
+// Syntax: alias database Name = cluster('...').database('...')
+type AliasStmt struct {
+	Alias     token.Pos // Position of "alias"
+	Name      *Ident    // Alias name
+	AssignPos token.Pos // Position of "="
+	Value     Expr      // Value expression (cluster(...).database(...))
+}
+
+func (x *AliasStmt) Pos() token.Pos { return x.Alias }
+func (x *AliasStmt) End() token.Pos {
+	if x.Value != nil {
+		return x.Value.End()
+	}
+	return x.AssignPos + 1
+}

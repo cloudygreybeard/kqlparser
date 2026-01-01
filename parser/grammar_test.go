@@ -186,10 +186,10 @@ func TestSpecificGrammarPatterns(t *testing.T) {
 
 		// Statements
 		{"let_simple", "let x = 5", false},
-		{"let_function", "let f = (a: int) { a * 2 }", true},    // TODO: typed params not supported
+		{"let_function", "let f = (a: int) { a * 2 }", false},   // Function with typed params
 		{"let_tabular", "let f = (T: (*)) { T | count }", true}, // TODO: tabular params not supported
 		{"set_option", "set notruncation", false},
-		{"declare_params", "declare query_parameters(x: int)", true}, // TODO: not supported
+		{"declare_params", "declare query_parameters(x: int)", false}, // Parses as function call
 
 		// Entity references
 		{"cluster_db_table", "cluster('help').database('Samples').StormEvents", false},

@@ -165,6 +165,10 @@ func (p *Parser) parseStmt() ast.Stmt {
 	case token.FIND:
 		// find is a special standalone operator that can start a query
 		return p.parseFindStmt()
+	case token.DECLARE:
+		return p.parseDeclareStmt()
+	case token.ALIAS:
+		return p.parseAliasStmt()
 	default:
 		// Expression statement (query)
 		expr := p.parseExpr()
@@ -195,7 +199,123 @@ func (p *Parser) parseFindStmt() ast.Stmt {
 	return &ast.ExprStmt{X: pipe}
 }
 
+// parseDeclareStmt parses a declare statement.
+// Syntax: declare query_parameters(...) or declare pattern name = ...
+func (p *Parser) parseDeclareStmt() ast.Stmt {
+	declarePos := p.pos
+	p.next() // consume 'declare'
+
+	switch p.tok {
+	case token.IDENT:
+		if p.lit == "query_parameters" {
+			return p.parseDeclareQueryParamsStmt(declarePos)
+		}
+	case token.PATTERN:
+		return p.parseDeclarePatternStmt(declarePos)
+	}
+
+	// Fall back to expression parsing
+	expr := p.parseExpr()
+	return &ast.DeclareStmt{Declare: declarePos, Body: expr}
+}
+
+// parseDeclareQueryParamsStmt parses declare query_parameters(...)
+func (p *Parser) parseDeclareQueryParamsStmt(declarePos token.Pos) *ast.DeclareStmt {
+	kindPos := p.pos
+	p.next() // consume 'query_parameters'
+
+	var params []*ast.FuncParam
+	if p.tok == token.LPAREN {
+		p.next() // consume '('
+		for p.tok != token.RPAREN && p.tok != token.EOF {
+			param := p.parseFuncParam()
+			if param != nil {
+				params = append(params, param)
+			}
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+		p.expect(token.RPAREN)
+	}
+
+	return &ast.DeclareStmt{
+		Declare: declarePos,
+		Kind:    "query_parameters",
+		KindPos: kindPos,
+		Params:  params,
+	}
+}
+
+// parseDeclarePatternStmt parses declare pattern name = ...
+func (p *Parser) parseDeclarePatternStmt(declarePos token.Pos) *ast.DeclareStmt {
+	kindPos := p.pos
+	p.next() // consume 'pattern'
+
+	name := p.parseIdent()
+	assignPos := p.expect(token.ASSIGN)
+
+	// Parse pattern body - function-like
+	var params []*ast.FuncParam
+	if p.tok == token.LPAREN {
+		p.next() // consume '('
+		for p.tok != token.RPAREN && p.tok != token.EOF {
+			param := p.parseFuncParam()
+			if param != nil {
+				params = append(params, param)
+			}
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+		p.expect(token.RPAREN)
+	}
+
+	var body ast.Expr
+	if p.tok == token.LBRACE {
+		p.next() // consume '{'
+		body = p.parseExpr()
+		p.expect(token.RBRACE)
+	}
+
+	return &ast.DeclareStmt{
+		Declare:   declarePos,
+		Kind:      "pattern",
+		KindPos:   kindPos,
+		Name:      name,
+		AssignPos: assignPos,
+		Params:    params,
+		Body:      body,
+	}
+}
+
+// parseAliasStmt parses an alias statement.
+// Syntax: alias database Name = cluster('...').database('...')
+func (p *Parser) parseAliasStmt() ast.Stmt {
+	aliasPos := p.pos
+	p.next() // consume 'alias'
+
+	// Expect 'database'
+	if p.tok != token.DATABASE {
+		p.error(p.pos, "expected 'database' after 'alias'")
+		return nil
+	}
+	p.next() // consume 'database'
+
+	name := p.parseIdent()
+	assignPos := p.expect(token.ASSIGN)
+	value := p.parseExpr()
+
+	return &ast.AliasStmt{
+		Alias:     aliasPos,
+		Name:      name,
+		AssignPos: assignPos,
+		Value:     value,
+	}
+}
+
 // parseLetStmt parses a let statement.
+// Supports: let x = expr; let f = (params) { body }; let v = view() { body }
 func (p *Parser) parseLetStmt() *ast.LetStmt {
 	letPos := p.pos
 	p.next() // consume 'let'
@@ -206,6 +326,18 @@ func (p *Parser) parseLetStmt() *ast.LetStmt {
 	}
 
 	assignPos := p.expect(token.ASSIGN)
+
+	// Check for view() declaration
+	if p.tok == token.VIEW {
+		return p.parseLetViewStmt(letPos, name, assignPos)
+	}
+
+	// Check for function definition with parameters
+	if p.tok == token.LPAREN {
+		return p.parseLetFunctionStmt(letPos, name, assignPos)
+	}
+
+	// Regular let statement
 	value := p.parseExpr()
 
 	return &ast.LetStmt{
@@ -213,6 +345,142 @@ func (p *Parser) parseLetStmt() *ast.LetStmt {
 		Name:   name,
 		Assign: assignPos,
 		Value:  value,
+	}
+}
+
+// parseLetFunctionStmt parses a let function definition.
+// Syntax: let f = (params) { body }
+func (p *Parser) parseLetFunctionStmt(letPos token.Pos, name *ast.Ident, assignPos token.Pos) *ast.LetStmt {
+	lparen := p.pos
+	p.next() // consume '('
+
+	// Parse parameters
+	var params []*ast.FuncParam
+	for p.tok != token.RPAREN && p.tok != token.EOF {
+		param := p.parseFuncParam()
+		if param != nil {
+			params = append(params, param)
+		}
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	rparen := p.expect(token.RPAREN)
+
+	// Parse optional body { ... }
+	var body ast.Expr
+	if p.tok == token.LBRACE {
+		p.next() // consume '{'
+		body = p.parseExpr()
+		p.expect(token.RBRACE)
+	}
+
+	// Create function expression
+	funcExpr := &ast.FuncExpr{
+		Lparen: lparen,
+		Params: params,
+		Rparen: rparen,
+		Body:   body,
+	}
+
+	return &ast.LetStmt{
+		Let:    letPos,
+		Name:   name,
+		Assign: assignPos,
+		Value:  funcExpr,
+	}
+}
+
+// parseLetViewStmt parses a let view declaration.
+// Syntax: let v = view() { body }
+func (p *Parser) parseLetViewStmt(letPos token.Pos, name *ast.Ident, assignPos token.Pos) *ast.LetStmt {
+	viewPos := p.pos
+	p.next() // consume 'view'
+
+	lparen := p.expect(token.LPAREN)
+	rparen := p.expect(token.RPAREN)
+
+	// Parse body { ... }
+	var body ast.Expr
+	if p.tok == token.LBRACE {
+		p.next() // consume '{'
+		body = p.parseExpr()
+		p.expect(token.RBRACE)
+	}
+
+	// Create view expression
+	viewExpr := &ast.ViewExpr{
+		View:   viewPos,
+		Lparen: lparen,
+		Rparen: rparen,
+		Body:   body,
+	}
+
+	return &ast.LetStmt{
+		Let:    letPos,
+		Name:   name,
+		Assign: assignPos,
+		Value:  viewExpr,
+	}
+}
+
+// parseFuncParam parses a function parameter.
+// Syntax: name: type [= default]
+func (p *Parser) parseFuncParam() *ast.FuncParam {
+	name := p.parseIdent()
+
+	param := &ast.FuncParam{Name: name}
+
+	// Parse optional type
+	if p.tok == token.COLON {
+		param.Colon = p.pos
+		p.next()
+
+		// Check for tabular type (Name: string, ...)
+		if p.tok == token.LPAREN {
+			param.Type = p.parseTabularType()
+		} else {
+			param.Type = p.parseIdent()
+		}
+	}
+
+	// Parse optional default value
+	if p.tok == token.ASSIGN {
+		param.Default = p.pos
+		p.next()
+		param.DefaultValue = p.parseExprNoPipe()
+	}
+
+	return param
+}
+
+// parseTabularType parses a tabular type schema.
+// Syntax: (Col1: type1, Col2: type2, ...)
+func (p *Parser) parseTabularType() ast.Expr {
+	lparen := p.pos
+	p.next() // consume '('
+
+	var cols []*ast.ColumnDeclExpr
+	for p.tok != token.RPAREN && p.tok != token.EOF {
+		col := &ast.ColumnDeclExpr{Name: p.parseIdent()}
+		if p.tok == token.COLON {
+			col.Colon = p.pos
+			p.next()
+			col.Type = p.parseIdent()
+		}
+		cols = append(cols, col)
+		if !p.accept(token.COMMA) {
+			break
+		}
+	}
+
+	rparen := p.expect(token.RPAREN)
+
+	return &ast.TabularTypeExpr{
+		Lparen:  lparen,
+		Columns: cols,
+		Rparen:  rparen,
 	}
 }
 
@@ -497,7 +765,7 @@ func (p *Parser) parseCompareExpr() ast.Expr {
 
 	switch p.tok {
 	case token.EQL, token.NEQ, token.LSS, token.GTR, token.LEQ, token.GEQ,
-		token.TILDE, token.NTILDE,
+		token.TILDE, token.NTILDE, token.COLON,
 		// Positive string operators
 		token.CONTAINS, token.CONTAINSCS,
 		token.STARTSWITH, token.STARTSWITHCS,
@@ -666,9 +934,16 @@ func (p *Parser) parseIndexExpr(x ast.Expr) *ast.IndexExpr {
 }
 
 // parseSelectorExpr parses a selector expression.
-func (p *Parser) parseSelectorExpr(x ast.Expr) *ast.SelectorExpr {
+// Also handles legacy element syntax: obj.["key"]
+func (p *Parser) parseSelectorExpr(x ast.Expr) ast.Expr {
 	dotPos := p.pos
 	p.next() // consume '.'
+
+	// Check for legacy element syntax: obj.["key"]
+	if p.tok == token.LBRACKET {
+		return p.parseIndexExpr(x)
+	}
+
 	sel := p.parseIdent()
 	return &ast.SelectorExpr{X: x, Dot: dotPos, Sel: sel}
 }
@@ -712,10 +987,14 @@ func (p *Parser) parsePrimaryExpr() ast.Expr {
 		return p.parseIdent()
 
 	// Type keywords used as function names
-	case token.DATETIMETYPE, token.TIMESPANTYPE, token.GUIDTYPE,
+	case token.DATETIMETYPE, token.GUIDTYPE,
 		token.LONGTYPE, token.INTTYPE, token.REALTYPE, token.STRINGTYPE,
 		token.BOOLTYPE:
 		return p.parseIdent()
+
+	// time() and timespan() with special literal parsing
+	case token.TIMESPANTYPE:
+		return p.parseTimespanLiteral()
 
 	case token.EOF:
 		return nil
@@ -756,6 +1035,53 @@ func (p *Parser) parseLiteral() *ast.BasicLit {
 	}
 	p.next()
 	return lit
+}
+
+// parseTimespanLiteral parses time() or timespan() with special literal content.
+// Syntax: time(1:30:00) or timespan(0.01:30:00.123)
+func (p *Parser) parseTimespanLiteral() ast.Expr {
+	// Get the function name (time or timespan)
+	fnName := p.parseIdent()
+
+	// Check if followed by (
+	if p.tok != token.LPAREN {
+		// Not a literal call, just return the identifier
+		return fnName
+	}
+
+	lparen := p.pos
+	p.next() // consume '('
+
+	// Scan raw content until matching ')' - this handles colons, dots, etc.
+	startPos := p.pos
+	content := p.scanTimespanContent()
+
+	rparen := p.expect(token.RPAREN)
+
+	// Return as a BasicLit with TIMESPAN kind
+	return &ast.CallExpr{
+		Fun:    fnName,
+		Lparen: lparen,
+		Args: []ast.Expr{
+			&ast.BasicLit{
+				ValuePos: startPos,
+				Kind:     token.TIMESPAN,
+				Value:    content,
+			},
+		},
+		Rparen: rparen,
+	}
+}
+
+// scanTimespanContent scans raw content for time/timespan literals.
+// Handles digits, colons, dots, and minus signs.
+func (p *Parser) scanTimespanContent() string {
+	var content string
+	for p.tok != token.RPAREN && p.tok != token.EOF {
+		content += p.lit
+		p.next()
+	}
+	return content
 }
 
 // parseParenExpr parses a parenthesized expression.
@@ -905,7 +1231,46 @@ func (p *Parser) parseMaterializeExpr() *ast.MaterializeExpr {
 }
 
 // parseNamedExpr parses an optionally named expression.
+// Also handles tuple unpacking: (A, B) = expr
 func (p *Parser) parseNamedExpr() ast.Expr {
+	// Check for tuple unpacking: (A, B, ...) = expr
+	if p.tok == token.LPAREN {
+		// Save state to restore if this isn't tuple unpacking
+		savedOffset := p.lex.Offset()
+		savedPos := p.pos
+		savedTok := p.tok
+		savedLit := p.lit
+
+		p.next() // consume '('
+		var names []*ast.Ident
+
+		// Try to parse as tuple of identifiers
+		for p.tok == token.IDENT || p.tok.IsKeyword() {
+			names = append(names, p.parseIdent())
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+
+		if p.tok == token.RPAREN && len(names) > 0 {
+			p.next() // consume ')'
+			if p.tok == token.ASSIGN {
+				// This is tuple unpacking
+				assignPos := p.pos
+				p.next()
+				expr := p.parseExpr()
+				return &ast.NamedExpr{Names: names, Assign: assignPos, Expr: expr}
+			}
+		}
+
+		// Not tuple unpacking, restore state and parse as regular expression
+		p.lex.Reset(savedOffset)
+		p.pos = savedPos
+		p.tok = savedTok
+		p.lit = savedLit
+		return p.parseExpr()
+	}
+
 	// Check if this is a named expression (name = expr)
 	if p.tok == token.IDENT {
 		// Look ahead to see if there's an =
@@ -968,7 +1333,7 @@ func (p *Parser) continueBinaryExpr(left ast.Expr) ast.Expr {
 	// Handle comparison
 	switch p.tok {
 	case token.EQL, token.NEQ, token.LSS, token.GTR, token.LEQ, token.GEQ,
-		token.TILDE, token.NTILDE,
+		token.TILDE, token.NTILDE, token.COLON,
 		// Positive string operators
 		token.CONTAINS, token.CONTAINSCS,
 		token.STARTSWITH, token.STARTSWITHCS,

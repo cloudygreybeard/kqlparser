@@ -140,7 +140,8 @@ func (x *StarExpr) End() token.Pos { return x.Star + 1 }
 
 // NamedExpr represents a named expression (name = expr).
 type NamedExpr struct {
-	Name   *Ident    // Column name (nil if unnamed)
+	Name   *Ident    // Column name (nil if unnamed or tuple)
+	Names  []*Ident  // Multiple names for tuple unpacking (A, B) = expr
 	Assign token.Pos // Position of "=" (NoPos if unnamed)
 	Expr   Expr      // Expression
 }
@@ -148,6 +149,9 @@ type NamedExpr struct {
 func (x *NamedExpr) Pos() token.Pos {
 	if x.Name != nil {
 		return x.Name.Pos()
+	}
+	if len(x.Names) > 0 {
+		return x.Names[0].Pos()
 	}
 	return x.Expr.Pos()
 }
@@ -206,3 +210,73 @@ type MaterializeExpr struct {
 
 func (x *MaterializeExpr) Pos() token.Pos { return x.Materialize }
 func (x *MaterializeExpr) End() token.Pos { return x.Rparen + 1 }
+
+// FuncExpr represents a function expression in a let statement.
+// Syntax: (params) { body }
+type FuncExpr struct {
+	Lparen token.Pos    // Position of "("
+	Params []*FuncParam // Function parameters
+	Rparen token.Pos    // Position of ")"
+	Lbrace token.Pos    // Position of "{"
+	Body   Expr         // Function body
+	Rbrace token.Pos    // Position of "}"
+}
+
+func (x *FuncExpr) Pos() token.Pos { return x.Lparen }
+func (x *FuncExpr) End() token.Pos {
+	if x.Rbrace != token.NoPos {
+		return x.Rbrace + 1
+	}
+	return x.Rparen + 1
+}
+
+// FuncParam represents a function parameter.
+// Syntax: name: type [= default]
+type FuncParam struct {
+	Name         *Ident    // Parameter name
+	Colon        token.Pos // Position of ":" (NoPos if no type)
+	Type         Expr      // Type (Ident or TabularTypeExpr)
+	Default      token.Pos // Position of "=" (NoPos if no default)
+	DefaultValue Expr      // Default value
+}
+
+func (x *FuncParam) Pos() token.Pos { return x.Name.Pos() }
+func (x *FuncParam) End() token.Pos {
+	if x.DefaultValue != nil {
+		return x.DefaultValue.End()
+	}
+	if x.Type != nil {
+		return x.Type.End()
+	}
+	return x.Name.End()
+}
+
+// ViewExpr represents a view expression in a let statement.
+// Syntax: view() { body }
+type ViewExpr struct {
+	View   token.Pos // Position of "view"
+	Lparen token.Pos // Position of "("
+	Rparen token.Pos // Position of ")"
+	Lbrace token.Pos // Position of "{"
+	Body   Expr      // View body
+	Rbrace token.Pos // Position of "}"
+}
+
+func (x *ViewExpr) Pos() token.Pos { return x.View }
+func (x *ViewExpr) End() token.Pos {
+	if x.Rbrace != token.NoPos {
+		return x.Rbrace + 1
+	}
+	return x.Rparen + 1
+}
+
+// TabularTypeExpr represents a tabular type schema.
+// Syntax: (Col1: type1, Col2: type2, ...)
+type TabularTypeExpr struct {
+	Lparen  token.Pos         // Position of "("
+	Columns []*ColumnDeclExpr // Column declarations
+	Rparen  token.Pos         // Position of ")"
+}
+
+func (x *TabularTypeExpr) Pos() token.Pos { return x.Lparen }
+func (x *TabularTypeExpr) End() token.Pos { return x.Rparen + 1 }

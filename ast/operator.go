@@ -594,7 +594,7 @@ type ScanOp struct {
 	Scan         token.Pos         // Position of "scan"
 	Params       []*OperatorParam  // Optional parameters
 	OrderByPos   token.Pos         // Position of "order by" (optional)
-	OrderBy      []*OrderExpr       // Order by expressions
+	OrderBy      []*OrderExpr      // Order by expressions
 	PartitionPos token.Pos         // Position of "partition by" (optional)
 	PartitionBy  []Expr            // Partition by expressions
 	DeclarePos   token.Pos         // Position of "declare" (optional)

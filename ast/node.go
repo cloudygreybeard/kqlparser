@@ -96,6 +96,12 @@ func (*FindOp) node()                {}
 func (*FindColumn) node()            {}
 func (*ScanStep) node()              {}
 func (*ScanAssign) node()            {}
+func (*FuncExpr) node()              {}
+func (*FuncParam) node()             {}
+func (*ViewExpr) node()              {}
+func (*TabularTypeExpr) node()       {}
+func (*DeclareStmt) node()           {}
+func (*AliasStmt) node()             {}
 func (*MakeGraphOp) node()           {}
 func (*MakeGraphWith) node()         {}
 func (*GraphMatchOp) node()          {}
@@ -141,9 +147,14 @@ func (*PipeExpr) expr()        {}
 func (*ToScalarExpr) expr()    {}
 func (*ToTableExpr) expr()     {}
 func (*MaterializeExpr) expr() {}
+func (*FuncExpr) expr()        {}
+func (*ViewExpr) expr()        {}
+func (*TabularTypeExpr) expr() {}
 
 // Statement nodes implement Stmt
 func (*LetStmt) stmt()        {}
+func (*DeclareStmt) stmt()    {}
+func (*AliasStmt) stmt()      {}
 func (*ExprStmt) stmt()       {}
 func (*QueryStmt) stmt()      {}
 func (*PrintStmt) stmt()      {}

@@ -1477,7 +1477,45 @@ func (p *Parser) parseNamedExprList() []*ast.NamedExpr {
 }
 
 // parseNamedExprSingle parses a single named expression.
+// Also handles tuple unpacking: (A, B) = expr
 func (p *Parser) parseNamedExprSingle() *ast.NamedExpr {
+	// Check for tuple unpacking: (A, B, ...) = expr
+	if p.tok == token.LPAREN {
+		// Save state to restore if this isn't tuple unpacking
+		savedOffset := p.lex.Offset()
+		savedPos := p.pos
+		savedTok := p.tok
+		savedLit := p.lit
+
+		p.next() // consume '('
+		var names []*ast.Ident
+
+		// Try to parse as tuple of identifiers
+		for p.tok == token.IDENT || p.tok.IsKeyword() {
+			names = append(names, p.parseIdent())
+			if !p.accept(token.COMMA) {
+				break
+			}
+		}
+
+		if p.tok == token.RPAREN && len(names) > 0 {
+			p.next() // consume ')'
+			if p.tok == token.ASSIGN {
+				// This is tuple unpacking
+				assignPos := p.pos
+				p.next()
+				expr := p.parseExprNoPipe()
+				return &ast.NamedExpr{Names: names, Assign: assignPos, Expr: expr}
+			}
+		}
+
+		// Not tuple unpacking, restore state and parse as regular expression
+		p.lex.Reset(savedOffset)
+		p.pos = savedPos
+		p.tok = savedTok
+		p.lit = savedLit
+	}
+
 	// Check if this is a named expression (name = expr)
 	if p.tok == token.IDENT {
 		name := p.parseIdent()
