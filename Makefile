@@ -182,18 +182,6 @@ ci: deps check test-cover-func ## CI pipeline (deps, check, coverage)
 dev: fmt check ## Development cycle (format, check)
 
 # ============================================================================
-# Documentation
-# ============================================================================
-
-.PHONY: doc doc-open
-doc: ## Start local godoc server
-	@echo "Starting godoc at http://localhost:6060/pkg/$(MODULE)/"
-	godoc -http=:6060
-
-doc-open: ## Open docs in browser (macOS)
-	open "http://localhost:6060/pkg/$(MODULE)/"
-
-# ============================================================================
 # Tools
 # ============================================================================
 
