@@ -16,7 +16,7 @@ func Fprint(w io.Writer, node Node) error {
 // Print returns a string representation of an AST node.
 func Print(node Node) string {
 	var b strings.Builder
-	Fprint(&b, node)
+	_ = Fprint(&b, node) // strings.Builder never returns an error
 	return b.String()
 }
 

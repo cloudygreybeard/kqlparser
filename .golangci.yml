@@ -1,0 +1,40 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+linters-settings:
+  # No additional settings needed
+
+issues:
+  exclude-rules:
+    # Allow unused warning/warningf methods (will be used for future diagnostics)
+    - path: binder/binder\.go
+      linters:
+        - unused
+      text: "warning|warningf"
+    
+    # Allow unused savedState (parser state management for future use)
+    - path: parser/parser\.go
+      linters:
+        - unused
+      text: "savedState|saved"
+    
+    # Allow unused expr() method stubs (AST interface compliance)
+    - path: ast/
+      linters:
+        - unused
+      text: "expr"
+    
+    # Exclude test files from some checks
+    - path: _test\.go
+      linters:
+        - errcheck
+

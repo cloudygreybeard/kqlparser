@@ -232,9 +232,7 @@ func (b *Binder) bindJoinOp(op *ast.JoinOp, inputType types.Type) types.Type {
 	}
 	if rightTab, ok := rightType.(*types.Tabular); ok {
 		// Add right columns (with potential renaming for duplicates)
-		for _, col := range rightTab.Columns {
-			columns = append(columns, col)
-		}
+		columns = append(columns, rightTab.Columns...)
 	}
 
 	newSchema := types.NewTabular(columns...)
@@ -437,9 +435,7 @@ func (b *Binder) bindLookupOp(op *ast.LookupOp, inputType types.Type) types.Type
 		columns = append(columns, leftTab.Columns...)
 	}
 	if rightTab, ok := rightType.(*types.Tabular); ok {
-		for _, col := range rightTab.Columns {
-			columns = append(columns, col)
-		}
+		columns = append(columns, rightTab.Columns...)
 	}
 
 	newSchema := types.NewTabular(columns...)

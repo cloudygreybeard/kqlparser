@@ -190,10 +190,7 @@ func (p *Parser) parseFindStmt() ast.Stmt {
 
 	// Parse any additional piped operators
 	for p.tok == token.PIPE {
-		op := p.parseOperator()
-		if op != nil {
-			pipe.Operators = append(pipe.Operators, op)
-		}
+		pipe.Operators = append(pipe.Operators, p.parseOperator())
 	}
 
 	return &ast.ExprStmt{X: pipe}
@@ -677,10 +674,7 @@ func (p *Parser) parsePipeExpr(source ast.Expr) *ast.PipeExpr {
 	pipe := &ast.PipeExpr{Source: source}
 
 	for p.tok == token.PIPE {
-		op := p.parseOperator()
-		if op != nil {
-			pipe.Operators = append(pipe.Operators, op)
-		}
+		pipe.Operators = append(pipe.Operators, p.parseOperator())
 	}
 
 	return pipe
@@ -708,10 +702,7 @@ func (p *Parser) parseContextualSubExpr() *ast.PipeExpr {
 
 	// Then parse any subsequent piped operators
 	for p.tok == token.PIPE {
-		op := p.parseOperator()
-		if op != nil {
-			pipe.Operators = append(pipe.Operators, op)
-		}
+		pipe.Operators = append(pipe.Operators, p.parseOperator())
 	}
 
 	return pipe
